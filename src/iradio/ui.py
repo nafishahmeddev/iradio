@@ -29,7 +29,7 @@ class Interface:
         self.screen = screen
         self.api = RadioAPI()
         self.favorites = Favorites(args.favorites_file)
-        self.player = Player(args.volume, args.output, args.device)
+        self.player = Player(args.volume, args.output, args.device, getattr(args, "gain_db", 0.0))
         self.stations = []
         self.selected = self.scroll = self.offset = 0
         self.query = {}
@@ -246,6 +246,7 @@ class Interface:
             detail = "No stream selected"
             if current:
                 detail = (
+                    f"PREAMP +{self.player.gain_db:g}dB • "
                     f"{current.get('country', '--')} • {current.get('bitrate', 0)} kbps • "
                     + str(current.get("tags") or "Internet radio")
                 )

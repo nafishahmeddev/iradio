@@ -113,3 +113,23 @@ directory request without the terminal UI or audio playback. A network failure
 is reported separately from an empty result; in the app press R to retry. Results
 are MP3-only and capped at 50 per page. A directory listing does not guarantee
 that every station stream is online.
+
+## Quiet audio / MAX98357A
+
+The app starts at 70% software volume. First try `iradio --volume 100`.
+For an ALSA/I²S setup, select your configured device explicitly:
+
+```sh
+iradio --output alsa --device plughw:0,0 --volume 100
+```
+
+If the stream is still quiet, add an audio preamp:
+
+```sh
+iradio --output alsa --device plughw:0,0 --volume 100 --gain-db 6
+```
+
+Use the device identifier from your working speaker test; `plughw:0,0` is an
+example. Audio gain is adjustable from 0 to 12 dB and uses soft clipping. Reduce
+it if sound distorts. This changes actual playback amplitude; waveform display
+gain only changes the drawing. The app does not adjust the system ALSA mixer.

@@ -74,6 +74,23 @@ class PlayerTests(unittest.TestCase):
         process.stdin.close.assert_called_once()
         self.assertIsNone(player.current)
 
+    @patch("iradio.player.subprocess.Popen")
+    def test_gain_and_alsa_device_are_applied_to_audio_output(self, popen):
+        audio, decoder = MagicMock(), MagicMock()
+        audio.poll.return_value = decoder.poll.return_value = None
+        decoder.stdout.read.return_value = b""
+        popen.side_effect = [audio, decoder]
+        player = Player(volume=100, output="alsa", device="plughw:0,0", gain_db=6)
+        try:
+            player.play({"url": "https://example.com"})
+            args = popen.call_args_list[0].args[0]
+            self.assertEqual(args[args.index("-P") + 1], "6")
+            self.assertEqual(args[args.index("-o") + 1], "alsa")
+            self.assertEqual(args[args.index("-a") + 1], "plughw:0,0")
+            decoder.stdin.write.assert_any_call(b"VOLUME 100\n")
+        finally:
+            player.stop()
+
     def test_remote_playback_feedback(self):
         player = Player()
         player.events.put("@P 2")

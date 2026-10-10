@@ -9,8 +9,9 @@ from .waveform import decode_pcm
 
 
 class Player:
-    def __init__(self, volume=70, output=None, device=None):
+    def __init__(self, volume=70, output=None, device=None, gain_db=0.0):
         self.volume = volume
+        self.gain_db = gain_db
         self.output = output
         self.device = device
         self.process = None
@@ -35,6 +36,8 @@ class Player:
             raise ValueError("Invalid stream URL")
         self.stop()
         audio_args = ["out123", "-q", "-r", "44100", "-c", "2", "-e", "s16"]
+        if self.gain_db:
+            audio_args.extend(["-P", str(self.gain_db), "--clip", "soft"])
         if self.output:
             audio_args.extend(["-o", self.output])
         if self.device:

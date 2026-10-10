@@ -19,12 +19,21 @@ def main(argv=None):
     )
     parser.add_argument("--search", metavar="NAME", help="initial station search")
     parser.add_argument("--volume", type=int, default=70, metavar="0-100")
-    parser.add_argument("--output", help="mpg123 output backend, e.g. alsa")
+    parser.add_argument(
+        "--gain-db",
+        type=float,
+        default=0.0,
+        metavar="0-12",
+        help="audio preamp gain in dB (default: 0; try 6 for quiet streams)",
+    )
+    parser.add_argument("--output", help="out123 output backend, e.g. alsa")
     parser.add_argument("--device", help="audio device, e.g. plughw:0,0")
     parser.add_argument("--favorites-file", type=Path, default=FAVORITES_PATH)
     args = parser.parse_args(argv)
     if not 0 <= args.volume <= 100:
         parser.error("--volume must be between 0 and 100")
+    if not 0 <= args.gain_db <= 12:
+        parser.error("--gain-db must be between 0 and 12")
     if args.country and (len(args.country) != 2 or not args.country.isalpha()):
         parser.error("--country must be a two-letter country code")
     if args.check_country:
