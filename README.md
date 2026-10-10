@@ -1,7 +1,7 @@
 # iRadio
 
 A keyboard-driven terminal internet radio player using Radio Browser and mpg123.
-Requires Python 3.9+ and a macOS or Linux terminal. There are no Python runtime dependencies.
+Requires mpg123 with its companion out123, Python 3.9+ and a macOS or Linux terminal. There are no Python runtime dependencies.
 
 ## Setup
 
@@ -38,10 +38,12 @@ iradio --help
 Audio uses mpg123's system default output unless explicitly configured. The directory
 filters for MP3 stations. Network requests run in the background with server failover;
 changing views discards outdated responses. Playback state and decoded elapsed time come from mpg123's remote protocol. The
-animated bars are an ambient visual effect, not an audio spectrum or volume meter.
+waveform uses actual signed PCM samples from the same decoder that feeds out123
+for playback. It is a waveform, not a frequency spectrum. Stereo audio is mixed
+to mono for display; playback remains stereo. Pauses and stale audio show a flat line.
 Live streams have no fixed duration, so the timer shows elapsed time alongside LIVE.
 Loading uses a spinner and moving activity bar rather than an estimated percentage.
-At 22 rows or more, the playback panel also shows station metadata and animation;
+At 22 rows or more, the playback panel also shows station metadata and a PCM waveform;
 smaller terminals use compact controls. Long playing-station titles scroll.
 
 

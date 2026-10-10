@@ -1,7 +1,5 @@
 """Time-based terminal animations (decorative, not sampled audio)."""
 
-import math
-
 SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 
@@ -14,23 +12,6 @@ def activity(seconds, width=18):
     position = int(seconds * 12) % (2 * max(1, width - 3))
     position = min(position, 2 * max(1, width - 3) - position)
     return "─" * position + "━━━" + "─" * max(0, width - position - 3)
-
-
-def visualizer(seconds, width=20, active=True):
-    if not active:
-        return "▁" * width
-    levels = "▁▂▃▄▅▆▇█"
-    return "".join(
-        levels[
-            min(
-                7,
-                int(
-                    (math.sin(seconds * 4 + i * 0.7) + math.sin(seconds * 2.7 - i * 0.4) + 2) * 1.9
-                ),
-            )
-        ]
-        for i in range(width)
-    )
 
 
 def duration(seconds):

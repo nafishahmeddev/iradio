@@ -57,11 +57,14 @@ class APITests(unittest.TestCase):
 class PlayerTests(unittest.TestCase):
     @patch("iradio.player.subprocess.Popen")
     def test_default_audio_commands_and_cleanup(self, popen):
-        process = popen.return_value
-        process.poll.return_value = None
+        audio, process = MagicMock(), MagicMock()
+        audio.poll.return_value = process.poll.return_value = None
+        process.stdout.read.return_value = b""
+        popen.side_effect = [audio, process]
         player = Player()
         player.play({"name": "Test", "url": "https://example.com"})
-        self.assertEqual(popen.call_args.args[0], ["mpg123", "-R"])
+        self.assertIn("--remote-err", popen.call_args.args[0])
+        self.assertEqual(popen.call_args_list[0].args[0][0], "out123")
         player.pause()
         self.assertTrue(player.paused)
         player.change_volume(100)

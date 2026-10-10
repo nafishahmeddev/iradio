@@ -29,9 +29,9 @@ def main(argv=None):
             "iRadio needs an interactive terminal. Run iradio --help for options.", file=sys.stderr
         )
         return 1
-    if not shutil.which("mpg123"):
+    if not all(shutil.which(tool) for tool in ("mpg123", "out123")):
         print(
-            "mpg123 is required. macOS: brew install mpg123; "
+            "mpg123 and out123 are required (both come with mpg123). macOS: brew install mpg123; "
             "Debian/Ubuntu: sudo apt install mpg123",
             file=sys.stderr,
         )

@@ -3,6 +3,9 @@
 import queue
 import subprocess
 import threading
+import time
+
+from .waveform import decode_pcm
 
 
 class Player:
@@ -11,6 +14,10 @@ class Player:
         self.output = output
         self.device = device
         self.process = None
+        self.audio_process = None
+        self.pcm = queue.Queue(maxsize=1)
+        self.samples = []
+        self.sample_time = 0.0
         self.current = None
         self.paused = False
         self.state = "idle"
@@ -19,7 +26,7 @@ class Player:
 
     def command(self, value):
         if self.process and self.process.poll() is None and self.process.stdin:
-            self.process.stdin.write(value + "\n")
+            self.process.stdin.write((value + "\n").encode())
             self.process.stdin.flush()
 
     def play(self, station):
@@ -27,31 +34,69 @@ class Player:
         if not isinstance(url, str) or "\n" in url or "\r" in url:
             raise ValueError("Invalid stream URL")
         self.stop()
-        args = ["mpg123", "-R"]
+        audio_args = ["out123", "-q", "-r", "44100", "-c", "2", "-e", "s16"]
         if self.output:
-            args.extend(["-o", self.output])
+            audio_args.extend(["-o", self.output])
         if self.device:
-            args.extend(["-a", self.device])
-        self.process = subprocess.Popen(
-            args,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            bufsize=1,
-        )
-        process = self.process
+            audio_args.extend(["-a", self.device])
+        try:
+            self.audio_process = subprocess.Popen(
+                audio_args,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                bufsize=0,
+            )
+            self.process = subprocess.Popen(
+                ["mpg123", "-R", "--remote-err", "-s", "-r", "44100", "--stereo", "-e", "s16"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0,
+            )
+        except OSError:
+            self.stop()
+            raise
+        process, audio = self.process, self.audio_process
         self.events = queue.Queue()
-        events = self.events
+        events, pcm = self.events, self.pcm
 
         def read_events():
             try:
-                for line in process.stdout:
-                    events.put(line.strip())
+                for line in process.stderr:
+                    events.put(line.decode("utf-8", errors="replace").strip())
             except (OSError, ValueError):
                 pass
 
+        def forward_pcm():
+            pending = b""
+            try:
+                while True:
+                    chunk = process.stdout.read(4096)
+                    if not chunk:
+                        break
+                    pending += chunk
+                    length = len(pending) // 4 * 4
+                    if not length:
+                        continue
+                    chunk, pending = pending[:length], pending[length:]
+                    view = memoryview(chunk)
+                    while view:
+                        written = audio.stdin.write(view)
+                        if not written:
+                            raise OSError("Audio output disconnected")
+                        view = view[written:]
+                    if pcm.full():
+                        try:
+                            pcm.get_nowait()
+                        except queue.Empty:
+                            pass
+                    pcm.put_nowait((time.monotonic(), decode_pcm(chunk)))
+            except (OSError, ValueError):
+                events.put("@E Audio output disconnected")
+
         threading.Thread(target=read_events, daemon=True).start()
+        threading.Thread(target=forward_pcm, daemon=True).start()
         self.state = "connecting"
         try:
             self.command(f"VOLUME {self.volume}")
@@ -63,6 +108,14 @@ class Player:
 
     def poll_events(self):
         """Read mpg123 playback status and its decoded elapsed time."""
+        try:
+            self.sample_time, self.samples = self.pcm.get_nowait()
+        except queue.Empty:
+            pass
+        if self.paused or time.monotonic() - self.sample_time > 0.4:
+            self.samples = []
+        if self.audio_process and self.audio_process.poll() is not None:
+            self.state = "error"
         while True:
             try:
                 line = self.events.get_nowait()
@@ -96,17 +149,22 @@ class Player:
         self.state = "idle"
         self.elapsed = 0.0
         self.events = queue.Queue()
-        if process:
+        audio, self.audio_process = self.audio_process, None
+        self.pcm = queue.Queue(maxsize=1)
+        self.samples = []
+        self.sample_time = 0.0
+        for child in (audio, process):
+            if not child:
+                continue
             try:
-                if process.poll() is None:
-                    process.terminate()
+                if child.poll() is None:
+                    child.terminate()
                     try:
-                        process.wait(timeout=2)
+                        child.wait(timeout=2)
                     except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait()
+                        child.kill()
+                        child.wait()
             finally:
-                if process.stdin:
-                    process.stdin.close()
-                if process.stdout:
-                    process.stdout.close()
+                for pipe in (child.stdin, child.stdout, child.stderr):
+                    if pipe:
+                        pipe.close()

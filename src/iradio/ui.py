@@ -5,11 +5,12 @@ import queue
 import threading
 import time
 
-from .animation import activity, duration, spinner, visualizer
+from .animation import activity, duration, spinner
 from .api import RadioAPI
 from .config import COUNTRIES, PAGE_SIZE
 from .favorites import Favorites
 from .player import Player
+from .waveform import waveform
 
 
 def clean(value):
@@ -148,7 +149,8 @@ class Interface:
         if w >= 76:
             self.put(4, w - 24, "COUNTRY   KBPS", curses.A_DIM)
         expanded = h >= 22
-        footer_height = 10 if expanded else 8
+        wave_height = 3 if h >= 26 else 1
+        footer_height = (10 + wave_height) if expanded else 8
         visible = h - footer_height - 5
         self.selected = max(0, min(self.selected, len(self.stations) - 1))
         self.scroll = max(0, min(self.scroll, self.selected))
@@ -223,27 +225,22 @@ class Interface:
             curses.A_DIM,
         )
         if expanded:
-            self.put(
-                base + 3,
-                2,
-                visualizer(
-                    now,
-                    min(28, w - 24),
-                    current is not None
-                    and self.player.state == "playing"
-                    and not self.player.paused,
-                ),
-                accent,
+            self.put(base + 3, 2, "AUDIO WAVEFORM / PCM", curses.A_DIM)
+            samples = (
+                self.player.samples
+                if self.player.state == "playing" and not self.player.paused
+                else []
             )
-            self.put(base + 3, min(32, w - 20), "AMBIENT ANIMATION", curses.A_DIM)
+            for row, line in enumerate(waveform(samples, w - 5, wave_height), base + 4):
+                self.put(row, 2, line, accent)
             detail = "No stream selected"
             if current:
                 detail = (
                     f"{current.get('country', '--')} • {current.get('bitrate', 0)} kbps • "
                     + str(current.get("tags") or "Internet radio")
                 )
-            self.put(base + 4, 2, detail, curses.A_DIM)
-        hint_start = base + (5 if expanded else 3)
+            self.put(base + 4 + wave_height, 2, detail, curses.A_DIM)
+        hint_start = base + (5 + wave_height if expanded else 3)
         if w >= 76:
             hints = (
                 "↑↓/jk Browse   Enter Play   Space Pause   +/- Volume",
