@@ -5,12 +5,11 @@ import queue
 import threading
 import time
 
-from .animation import activity, duration, spinner
 from .api import RadioAPI
 from .config import COUNTRIES, PAGE_SIZE
 from .favorites import Favorites
 from .player import Player
-from .waveform import waveform
+from .view import View, fit
 
 
 def clean(value):
@@ -56,24 +55,34 @@ class Interface:
                 background = -1
             except curses.error:
                 background = curses.COLOR_BLACK
-            for index, (name, color) in enumerate(
-                [
-                    ("accent", curses.COLOR_CYAN),
-                    ("good", curses.COLOR_GREEN),
-                    ("muted", curses.COLOR_BLUE),
-                    ("warm", curses.COLOR_YELLOW),
-                ],
-                1,
-            ):
-                curses.init_pair(index, color, background)
+            rich = curses.COLORS >= 256
+            palette = [
+                ("text", 252 if rich else curses.COLOR_WHITE, background),
+                ("accent", 81 if rich else curses.COLOR_CYAN, background),
+                ("good", 114 if rich else curses.COLOR_GREEN, background),
+                ("muted", 245 if rich else curses.COLOR_WHITE, background),
+                ("warm", 221 if rich else curses.COLOR_YELLOW, background),
+                ("border", 240 if rich else curses.COLOR_BLUE, background),
+                ("wave", 141 if rich else curses.COLOR_MAGENTA, background),
+                ("selected", 16 if rich else curses.COLOR_BLACK, 81 if rich else curses.COLOR_CYAN),
+            ]
+            for index, (name, foreground, bg) in enumerate(palette, 1):
+                if index >= curses.COLOR_PAIRS:
+                    break
+                curses.init_pair(index, foreground, bg)
                 self.colors[name] = curses.color_pair(index)
+        self.view = View(self)
 
     def put(self, y, x, text, attr=0, width=None):
         h, w = self.screen.getmaxyx()
         if 0 <= y < h and 0 <= x < w - 1:
             try:
                 self.screen.addnstr(
-                    y, x, clean(text), min(w - x - 1, width if width is not None else w), attr
+                    y,
+                    x,
+                    fit(clean(text), min(w - x - 1, width if width is not None else w)),
+                    w - x - 1,
+                    attr,
                 )
             except curses.error:
                 pass
@@ -120,165 +129,7 @@ class Interface:
                 self.status = f"{len(stations)} stations loaded • ? for all controls"
 
     def draw(self):
-        screen = self.screen
-        screen.erase()
-        h, w = screen.getmaxyx()
-        now = time.monotonic()
-        self.player.poll_events()
-        accent = self.colors.get("accent", 0)
-        if h < 16 or w < 48:
-            self.put(0, 0, "iRadio | Enlarge terminal to at least 48 x 16", curses.A_BOLD)
-            self.put(2, 0, "Q quit | Playback continues while resizing")
-            screen.refresh()
-            return
-        self.put(0, 2, "iRADIO", accent | curses.A_BOLD)
-        self.put(0, 11, " /  YOUR WORLD, ON AIR", curses.A_DIM)
-        self.put(
-            1,
-            2,
-            "[ BROWSE ]   [ B SAVED ]   [ / SEARCH ]   [ ? HELP ]",
-            accent if w >= 60 else curses.A_DIM,
-        )
-        self.put(2, 2, self.mode, curses.A_BOLD, w - 24)
-        self.put(
-            2,
-            max(25, w - 20),
-            f"{spinner(now)} LOADING"
-            if self.loading
-            else f"PAGE {self.offset // PAGE_SIZE + 1}  /  {len(self.stations)}",
-            accent,
-        )
-        self.put(3, 2, "─" * (w - 4), accent)
-        self.put(4, 2, "   #  STATION", curses.A_DIM)
-        if w >= 76:
-            self.put(4, w - 24, "COUNTRY   KBPS", curses.A_DIM)
-        expanded = h >= 22
-        wave_height = 3
-        footer_height = (10 + wave_height) if expanded else 8
-        visible = h - footer_height - 5
-        self.selected = max(0, min(self.selected, len(self.stations) - 1))
-        self.scroll = max(0, min(self.scroll, self.selected))
-        if self.selected >= self.scroll + visible:
-            self.scroll = self.selected - visible + 1
-        for row, station in enumerate(self.stations[self.scroll : self.scroll + visible]):
-            index = self.scroll + row
-            active = index == self.selected
-            attr = curses.A_REVERSE | curses.A_BOLD if active else 0
-            self.put(5 + row, 2, " " * (w - 4), attr)
-            current = self.player.current
-            playing = current and (current.get("url_resolved") or current.get("url")) == (
-                station.get("url_resolved") or station.get("url")
-            )
-            star = "▶" if playing else "★" if self.favorites.contains(station) else " "
-            self.put(
-                5 + row,
-                2,
-                f"{star} {index + 1:3}  {station.get('name', 'Unknown')}",
-                attr,
-                w - 28 if w >= 76 else w - 5,
-            )
-            if w >= 76:
-                self.put(
-                    5 + row,
-                    w - 24,
-                    f"{station.get('countrycode', '--'):7}   {station.get('bitrate', 0)}k",
-                    attr,
-                )
-        if not self.stations:
-            self.put(
-                6,
-                4,
-                "Loading the directory..."
-                if self.loading
-                else (
-                    "Directory unavailable. Press R to retry."
-                    if self.load_error
-                    else "No favorites yet. Browse with T and press F to save."
-                    if self.mode == "Favorites"
-                    else "No matches. Try / search or T top stations."
-                ),
-                curses.A_DIM,
-            )
-        base = h - footer_height
-        self.put(base, 2, "─" * (w - 4), accent)
-        current = self.player.current
-        state = self.player.state.upper()
-        if self.player.paused:
-            state = "PAUSED"
-        label = f"{spinner(now)} CONNECTING" if state == "CONNECTING" else state
-        title = (
-            clean(current.get("name", "Unknown")) if current else "Choose a station • Enter to play"
-        )
-        title_width = max(8, w - len(label) - 8)
-        if len(title) > title_width and current:
-            loop = title + "   •   "
-            shift = int(now * 3) % len(loop)
-            title = (loop + loop)[shift : shift + title_width]
-        self.put(
-            base + 1,
-            2,
-            f"{label if current else 'READY'}  {title}",
-            self.colors.get("good", 0) | curses.A_BOLD,
-        )
-        bars = round(self.player.volume / 10)
-        self.put(
-            base + 2, 2, f"VOL {'━' * bars}{'─' * (10 - bars)} {self.player.volume:3}%", accent
-        )
-        self.put(
-            base + 2,
-            26,
-            f"{duration(self.player.elapsed)} / LIVE" if current else "LIVE RADIO",
-            curses.A_DIM,
-        )
-        if expanded:
-            samples = (
-                self.player.samples
-                if self.player.state == "playing" and not self.player.paused
-                else []
-            )
-            peak = max((abs(value) for value in samples), default=0.0)
-            # Immediate response to louder sound; gradual gain recovery after peaks.
-            self.wave_peak = max(peak, self.wave_peak * 0.97, 0.01)
-            gain = min(8.0, max(1.0, 0.85 / self.wave_peak))
-            self.put(base + 3, 2, f"AUDIO WAVEFORM / PCM • DISPLAY GAIN {gain:.1f}×", curses.A_DIM)
-            for row, line in enumerate(waveform(samples, w - 5, wave_height, gain), base + 4):
-                self.put(row, 2, line, accent)
-            detail = "No stream selected"
-            if current:
-                detail = (
-                    f"PREAMP +{self.player.gain_db:g}dB • "
-                    f"{current.get('country', '--')} • {current.get('bitrate', 0)} kbps • "
-                    + str(current.get("tags") or "Internet radio")
-                )
-            self.put(base + 4 + wave_height, 2, detail, curses.A_DIM)
-        hint_start = base + (5 + wave_height if expanded else 3)
-        if w >= 76:
-            hints = (
-                "↑↓/jk Browse   Enter Play   Space Pause   +/- Volume",
-                "/ Search  C Country  G Genre  F Save  B Saved  T Top",
-                "[ ] Pages   R Refresh   S Stop   ? Help   Q Quit",
-            )
-        else:
-            hints = (
-                "↑↓ Select  Enter Play  Space Pause  +/- Vol",
-                "/ Search  C Country  F Save  B Saved",
-                "[ ] Page  S Stop  T Top  ? Help  Q Quit",
-            )
-        for row, hint in enumerate(hints, hint_start):
-            self.put(row, 2, hint, curses.A_DIM)
-        status = self.status
-        if self.loading:
-            elapsed = now - self.loading_started
-            status = (
-                f"{spinner(now)} {activity(elapsed, 12)} Loading stations • {elapsed:.0f}s • Q quit"
-            )
-        elif self.player.state == "error":
-            status = "Stream unavailable • Enter to retry or choose another station"
-        elif self.player.state == "stopped" and current:
-            status = "Stream ended • Enter to reconnect"
-        self.put(h - 2, 2, "─" * (w - 4), curses.A_DIM)
-        self.put(h - 1, 2, status, self.colors.get("warm", 0))
-        screen.refresh()
+        self.view.draw()
 
     def prompt(self, label):
         value = ""
