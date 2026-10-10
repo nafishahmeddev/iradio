@@ -33,14 +33,18 @@ iradio --search jazz
 iradio --output alsa --device plughw:0,0
 iradio --favorites-file ./favorites.json
 iradio --help
+iradio --check-country SA
+iradio --check-country BD
 ```
 
-Audio uses mpg123's system default output unless explicitly configured. The directory
+Audio uses out123's system default output unless explicitly configured. The directory
 filters for MP3 stations. Network requests run in the background with server failover;
 changing views discards outdated responses. Playback state and decoded elapsed time come from mpg123's remote protocol. The
 waveform uses actual signed PCM samples from the same decoder that feeds out123
 for playback. It is a waveform, not a frequency spectrum. Stereo audio is mixed
-to mono for display; playback remains stereo. Pauses and stale audio show a flat line.
+to mono for display; playback remains stereo. Braille cells provide four vertical
+pixels per terminal row. Automatic display gain (up to 8×) makes quieter audio
+visible without changing playback volume; gain recovers gradually after loud peaks. Pauses and stale audio show a flat line.
 Live streams have no fixed duration, so the timer shows elapsed time alongside LIVE.
 Loading uses a spinner and moving activity bar rather than an estimated percentage.
 At 22 rows or more, the playback panel also shows station metadata and a PCM waveform;
@@ -84,7 +88,8 @@ src/iradio/
   config.py             Defaults and country shortcuts
   api.py                Station directory transport
   favorites.py          Persistent favorites
-  player.py             Audio process lifecycle
+  player.py             Decoder, PCM forwarding, audio process lifecycle
+  waveform.py           Signed PCM waveform rendering
   ui.py                 Terminal UI and input handling
 tests/                  Offline behavioral tests
 ```
@@ -100,3 +105,11 @@ ruff check .
 Tests use temporary files and mocked network/audio calls. Live streaming needs an
 internet connection and an installed mpg123 player. Native Windows terminals are
 not supported by this curses interface.
+
+## Diagnosing country loading
+
+Run `iradio --check-country SA` or `iradio --check-country BD` to test the same
+directory request without the terminal UI or audio playback. A network failure
+is reported separately from an empty result; in the app press R to retry. Results
+are MP3-only and capped at 50 per page. A directory listing does not guarantee
+that every station stream is online.

@@ -14,6 +14,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="iRadio — internet radio in your terminal")
     parser.add_argument("--version", action="version", version=f"iRadio {__version__}")
     parser.add_argument("--country", metavar="CODE", help="initial two-letter country code")
+    parser.add_argument(
+        "--check-country", metavar="CODE", help="test directory loading without opening the player"
+    )
     parser.add_argument("--search", metavar="NAME", help="initial station search")
     parser.add_argument("--volume", type=int, default=70, metavar="0-100")
     parser.add_argument("--output", help="mpg123 output backend, e.g. alsa")
@@ -24,6 +27,21 @@ def main(argv=None):
         parser.error("--volume must be between 0 and 100")
     if args.country and (len(args.country) != 2 or not args.country.isalpha()):
         parser.error("--country must be a two-letter country code")
+    if args.check_country:
+        code = args.check_country.upper()
+        if len(code) != 2 or not code.isascii() or not code.isalpha():
+            parser.error("--check-country must be a two-letter country code")
+        from .api import RadioAPI
+
+        try:
+            stations = RadioAPI().search({"countrycode": code})
+        except RuntimeError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"{code}: {len(stations)} playable MP3 stations on the first page")
+        for station in stations[:5]:
+            print(f"  {station.get('name', 'Unknown')}")
+        return 0
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         print(
             "iRadio needs an interactive terminal. Run iradio --help for options.", file=sys.stderr

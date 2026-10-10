@@ -45,7 +45,9 @@ class Interface:
         self.results = queue.Queue()
         self.generation = 0
         self.loading = False
+        self.load_error = None
         self.loading_started = time.monotonic()
+        self.wave_peak = 0.1
         self.colors = {}
         if curses.has_colors():
             curses.start_color()
@@ -85,6 +87,7 @@ class Interface:
             self.selected = self.scroll = self.offset = 0
         self.display_query = query
         self.loading = True
+        self.load_error = None
         self.loading_started = time.monotonic()
         self.status = "Loading stations... You can still browse or quit."
 
@@ -106,6 +109,7 @@ class Interface:
                 continue
             self.loading = False
             if error:
+                self.load_error = error
                 self.status = f"{error} • R retry"
             elif not stations and offset > self.offset:
                 self.status = "No more stations. You are still on the last available page."
@@ -149,7 +153,7 @@ class Interface:
         if w >= 76:
             self.put(4, w - 24, "COUNTRY   KBPS", curses.A_DIM)
         expanded = h >= 22
-        wave_height = 3 if h >= 26 else 1
+        wave_height = 3
         footer_height = (10 + wave_height) if expanded else 8
         visible = h - footer_height - 5
         self.selected = max(0, min(self.selected, len(self.stations) - 1))
@@ -187,7 +191,9 @@ class Interface:
                 "Loading the directory..."
                 if self.loading
                 else (
-                    "No favorites yet. Browse with T and press F to save."
+                    "Directory unavailable. Press R to retry."
+                    if self.load_error
+                    else "No favorites yet. Browse with T and press F to save."
                     if self.mode == "Favorites"
                     else "No matches. Try / search or T top stations."
                 ),
@@ -225,13 +231,17 @@ class Interface:
             curses.A_DIM,
         )
         if expanded:
-            self.put(base + 3, 2, "AUDIO WAVEFORM / PCM", curses.A_DIM)
             samples = (
                 self.player.samples
                 if self.player.state == "playing" and not self.player.paused
                 else []
             )
-            for row, line in enumerate(waveform(samples, w - 5, wave_height), base + 4):
+            peak = max((abs(value) for value in samples), default=0.0)
+            # Immediate response to louder sound; gradual gain recovery after peaks.
+            self.wave_peak = max(peak, self.wave_peak * 0.97, 0.01)
+            gain = min(8.0, max(1.0, 0.85 / self.wave_peak))
+            self.put(base + 3, 2, f"AUDIO WAVEFORM / PCM • DISPLAY GAIN {gain:.1f}×", curses.A_DIM)
+            for row, line in enumerate(waveform(samples, w - 5, wave_height, gain), base + 4):
                 self.put(row, 2, line, accent)
             detail = "No stream selected"
             if current:
@@ -408,6 +418,7 @@ class Interface:
             self.generation += 1
             self.loading = False
             self.display_query = None
+            self.load_error = None
             self.mode = "Favorites"
             self.stations = list(self.favorites.stations)
             self.offset = self.selected = self.scroll = 0
@@ -428,7 +439,7 @@ class Interface:
 def run(screen, args):
     cursor(False)
     screen.keypad(True)
-    screen.timeout(100)
+    screen.timeout(50)
     app = Interface(screen, args)
     app.fetch()
     try:
