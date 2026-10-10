@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,12 +9,32 @@ description = "A keyboard-driven terminal radio player"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = []
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Nafish Ahmed"}]
+keywords = ["radio", "terminal", "cli", "audio", "curses"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console :: Curses",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Multimedia :: Sound/Audio :: Players",
+]
+
+[project.urls]
+Homepage = "https://github.com/nafishahmeddev/iradio"
+Repository = "https://github.com/nafishahmeddev/iradio"
+Issues = "https://github.com/nafishahmeddev/iradio/issues"
+Changelog = "https://github.com/nafishahmeddev/iradio/blob/main/CHANGELOG.md"
 
 [project.scripts]
 iradio = "iradio.cli:main"
 
 [project.optional-dependencies]
-dev = ["ruff>=0.9"]
+dev = ["ruff>=0.9", "build>=1.2", "twine>=5"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

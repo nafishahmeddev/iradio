@@ -131,19 +131,34 @@ class Interface:
     def draw(self):
         self.view.draw()
 
+    def modal(self, title, desired_height=18, desired_width=60):
+        self.draw()
+        h, w = self.screen.getmaxyx()
+        height, width = min(desired_height, h), min(desired_width, w - 2)
+        y, x = max(0, (h - height) // 2), max(0, (w - width) // 2)
+        self.view.panel(y, x, height, width, title)
+        return y, x, height, width
+
     def prompt(self, label):
         value = ""
         cursor(True)
         try:
             while True:
                 self.receive()
-                self.draw()
-                h, w = self.screen.getmaxyx()
-                self.screen.move(h - 1, 0)
-                self.screen.clrtoeol()
-                prefix = f"{label}: " if w >= 76 else "Search: "
-                available = max(1, w - len(prefix) - 3)
-                self.put(h - 1, 1, prefix + value[-available:])
+                y, x, height, width = self.modal("FIND YOUR FREQUENCY", 7)
+                self.view.text(
+                    y + 1, x + 2, label.replace(" (Esc cancels)", ""), width - 4, "muted"
+                )
+                available = max(1, width - 7)
+                text = value[-available:]
+                self.view.text(y + 3, x + 2, "› " + text, width - 4, "accent", True)
+                self.view.text(
+                    y + height - 2, x + 2, "Enter search  ·  Esc cancel", width - 4, "muted"
+                )
+                self.screen.move(
+                    min(y + 3, self.screen.getmaxyx()[0] - 1),
+                    min(x + 4 + len(text), self.screen.getmaxyx()[1] - 2),
+                )
                 self.screen.refresh()
                 try:
                     key = self.screen.get_wch()
@@ -162,31 +177,30 @@ class Interface:
 
     def help(self):
         lines = [
-            "↑↓ / j k   Select a station",
-            "Enter      Play selected station",
-            "Space      Pause / resume",
-            "+ / -      Adjust volume",
-            "/          Search station names",
-            "C          Choose country",
-            "G          Search genre",
-            "F          Save / remove favorite",
-            "B          Open favorites",
-            "T          Top worldwide stations",
-            "[ / ]      Previous / next page",
-            "R          Retry / refresh",
-            "S          Stop playback",
-            "Q          Quit the app",
-            "Esc        Cancel a search or picker",
+            "↑↓ / j k    Browse stations",
+            "Enter       Tune in",
+            "Space       Pause / resume",
+            "+ / -       Adjust volume",
+            "/           Search by name",
+            "C           Explore countries",
+            "G           Explore genres",
+            "F           Save / remove favorite",
+            "B           Your saved stations",
+            "T           Discover worldwide",
+            "[ / ]       Previous / next page",
+            "R           Refresh / retry",
+            "S           Stop playback",
+            "Q           Quit iRadio",
+            "Esc         Close a dialog",
         ]
         start = 0
         while True:
-            self.screen.erase()
-            h, _ = self.screen.getmaxyx()
-            self.put(0, 2, "iRADIO / KEYBOARD GUIDE", curses.A_BOLD)
-            self.put(1, 2, "↑↓ scroll • Esc / ? close", curses.A_DIM)
-            visible = max(1, h - 3)
-            for row, line in enumerate(lines[start : start + visible], 3):
-                self.put(row, 2, line)
+            y, x, height, width = self.modal("THE CONTROLS", 22)
+            visible = max(1, height - 5)
+            start = min(start, max(0, len(lines) - visible))
+            for row, line in enumerate(lines[start : start + visible], y + 2):
+                self.view.text(row, x + 3, line, width - 6, "text")
+            self.view.text(y + height - 2, x + 2, "↑↓ scroll  ·  Esc / ? close", width - 4, "muted")
             self.screen.refresh()
             key = self.screen.getch()
             if key in (27, ord("?"), ord("q"), ord("Q")):
@@ -199,19 +213,22 @@ class Interface:
     def country_picker(self):
         selected = 0
         while True:
-            self.screen.erase()
-            h, w = self.screen.getmaxyx()
-            self.put(0, 2, "CHOOSE A COUNTRY", curses.A_BOLD | self.colors.get("accent", 0))
-            self.put(1, 2, "↑↓ or j/k select • Enter choose • Esc cancel", curses.A_DIM)
-            visible = max(1, h - 4)
+            y, x, height, width = self.modal("EXPLORE THE WORLD", 24, 52)
+            self.view.text(y + 1, x + 2, "Choose where you want to listen.", width - 4, "muted")
+            visible = max(1, height - 5)
             start = max(0, selected - visible + 1)
-            for row, (name, code) in enumerate(COUNTRIES[start : start + visible]):
-                self.put(
-                    row + 3,
-                    2,
-                    f"{code}  {name}",
-                    curses.A_REVERSE if start + row == selected else 0,
-                )
+            for row, (name, code) in enumerate(COUNTRIES[start : start + visible], y + 3):
+                active = start + row - y - 3 == selected
+                style = "selected" if active else "text"
+                self.view.text(row, x + 1, " " * (width - 2), width - 2, style)
+                self.view.text(row, x + 3, f"{code}    {name}", width - 6, style, active)
+            self.view.text(
+                y + height - 2,
+                x + 2,
+                "↑↓ / jk move  ·  Enter select  ·  Esc back",
+                width - 4,
+                "muted",
+            )
             self.screen.refresh()
             key = self.screen.getch()
             if key in (27, ord("q"), ord("Q")):

@@ -7,3 +7,12 @@ dist/
 .ruff_cache/
 .coverage
 .DS_Store
+
+# Local editor settings and personal data
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+favorites.json
+*.log

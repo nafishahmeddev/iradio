@@ -1,0 +1,17 @@
+name: Feature request
+description: Propose an improvement to iRadio.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the interaction and any alternatives you considered.
+    validations:
+      required: true

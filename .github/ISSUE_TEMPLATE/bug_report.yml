@@ -1,0 +1,30 @@
+name: Bug report
+description: Report a reproducible problem in iRadio.
+title: "[Bug]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include expected behavior and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include your command and relevant keys pressed. Remove private URLs.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, iRadio version, terminal size, mpg123/out123 versions, audio backend and device.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Output or screenshot
+      description: For directory failures, include iradio --check-country CODE output. Remove private data.

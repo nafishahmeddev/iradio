@@ -1,9 +1,33 @@
 # iRadio
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-81d4fa)](LICENSE)
+[![CI](https://github.com/nafishahmeddev/iradio/actions/workflows/ci.yml/badge.svg)](https://github.com/nafishahmeddev/iradio/actions/workflows/ci.yml)
+
+Browse the world. Tune in. See the sound.
+
 A keyboard-driven terminal internet radio player using Radio Browser and mpg123.
 Requires mpg123 with its companion out123, Python 3.9+ and a macOS or Linux terminal. There are no Python runtime dependencies.
 
+## Features
+
+- Explore stations by country, name, or genre, with saved favorites.
+- A responsive station library and listening deck with a real PCM waveform.
+- Keyboard navigation, search dialogs, and live playback feedback.
+- Configurable output devices, volume, and optional audio preamp gain.
+- No Python runtime dependencies; macOS and Linux terminal support.
+
+This is an early-stage project. Station availability depends on the external
+directory and broadcasters. Native Windows terminals are not supported.
+
 ## Setup
+
+Clone the source repository before running the setup commands:
+
+```sh
+git clone https://github.com/nafishahmeddev/iradio.git
+cd iradio
+```
+
 
 Install the audio player:
 
@@ -47,8 +71,11 @@ pixels per terminal row. Automatic display gain (up to 8×) makes quieter audio
 visible without changing playback volume; gain recovers gradually after loud peaks. Pauses and stale audio show a flat line.
 Live streams have no fixed duration, so the timer shows elapsed time alongside LIVE.
 Loading uses a spinner and moving activity bar rather than an estimated percentage.
-At 22 rows or more, the playback panel also shows station metadata and a PCM waveform;
-smaller terminals use compact controls. Long playing-station titles scroll.
+At 100 columns or more, a station library and listening deck sit side by side.
+Narrower terminals stack the panels; compact layouts retain a waveform and volume
+control. The listening deck shows playback state, station details and a violet PCM
+waveform. Long station titles scroll. Search, country selection and keyboard help
+open centered dialogs. Use 110×30 or larger for the full listening deck.
 
 
 ## Controls
@@ -90,6 +117,7 @@ src/iradio/
   favorites.py          Persistent favorites
   player.py             Decoder, PCM forwarding, audio process lifecycle
   waveform.py           Signed PCM waveform rendering
+  view.py               Responsive panels and visual theme
   ui.py                 Terminal UI and input handling
 tests/                  Offline behavioral tests
 ```
@@ -100,6 +128,9 @@ tests/                  Offline behavioral tests
 python -m pip install -e '.[dev]'
 python -m unittest discover -s tests -v
 ruff check .
+ruff format --check .
+python -m build
+python -m twine check dist/*
 ```
 
 Tests use temporary files and mocked network/audio calls. Live streaming needs an
@@ -133,3 +164,20 @@ Use the device identifier from your working speaker test; `plughw:0,0` is an
 example. Audio gain is adjustable from 0 to 12 dB and uses soft clipping. Reduce
 it if sound distorts. This changes actual playback amplitude; waveform display
 gain only changes the drawing. The app does not adjust the system ALSA mixer.
+
+## Contributing and support
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, validation, and PR guidance.
+Use [GitHub issues](https://github.com/nafishahmeddev/iradio/issues) for bugs and
+feature requests. Follow the [code of conduct](CODE_OF_CONDUCT.md). Report
+vulnerabilities according to [SECURITY.md](SECURITY.md). See
+[CHANGELOG.md](CHANGELOG.md) for changes.
+
+## License and acknowledgments
+
+Licensed under the [MIT License](LICENSE).
+
+Station discovery is provided by [Radio Browser](https://www.radio-browser.info/).
+Audio decoding and output use [mpg123 and out123](https://www.mpg123.de/), installed
+separately under their own licenses. The iRadio license covers this repository's
+code; it does not grant rights to third-party audio broadcasts.
