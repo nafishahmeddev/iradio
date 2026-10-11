@@ -1,0 +1,36 @@
+{
+  "name": "iradio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Internet radio from all over the world, with the sound drawn live in WebGL",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n site,api -c auto \"astro dev\" \"wrangler dev --port 8787\"",
+    "predev": "npm run build",
+    "catalogue": "tsx scripts/build-catalogue.ts",
+    "build": "npm run catalogue && astro build",
+    "preview": "npm run build && wrangler dev --port 8787",
+    "deploy": "npm run build && wrangler deploy",
+    "check": "astro check",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@phosphor-icons/core": "^2.1.1",
+    "astro": "^7.3.8",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/node": "^24.19.2",
+    "concurrently": "^10.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.149.0"
+  }
+}

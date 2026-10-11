@@ -1,0 +1,176 @@
+---
+import Icon from './Icon.astro';
+import Logo from './Logo.astro';
+---
+
+<section class="stage" aria-label="Now playing">
+  <div class="now">
+    <p class="brand"><Logo size={28} /><span class="display">iradio</span></p>
+    <p class="badge label" id="badge" data-state="idle">
+      <span class="badge-dot" aria-hidden="true"></span>
+      <span id="badge-text">Ready</span>
+      <span id="clock"></span>
+    </p>
+    <h1 class="title display" id="title">Find your frequency.</h1>
+    <p class="label muted clip" id="meta">Stations from every corner of the world</p>
+  </div>
+
+  <!-- The WebGL scene draws its ripples outward from this element. -->
+  <div class="dial" id="dial">
+    <button type="button" class="art logo swap" id="art" data-action="toggle" data-state="idle">
+      <span id="art-mono" aria-hidden="true"></span>
+      <img id="art-image" alt="" referrerpolicy="no-referrer" />
+      <span class="art-veil swap" aria-hidden="true">
+        <Icon name="play" size={30} class="show-play" />
+        <Icon name="pause" size={30} class="show-pause" />
+      </span>
+    </button>
+  </div>
+</section>
+
+<style>
+  .stage {
+    grid-area: stage;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: var(--space-5);
+    height: clamp(13rem, 40vh, 27rem);
+    min-width: 0;
+    padding: var(--space-5) var(--space-6) var(--space-5);
+  }
+
+  .now {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  /* The rail carries the mark on wide screens; here it leads the stage on small ones. */
+  .brand {
+    display: none;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    font-size: 1.125rem;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--color-muted);
+  }
+
+  .badge-dot {
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: var(--radius-full);
+    background: currentColor;
+  }
+
+  .badge[data-state='playing'] {
+    color: var(--color-amber);
+  }
+
+  .badge[data-state='playing'] .badge-dot {
+    box-shadow: 0 0 0.75rem currentColor;
+    animation: pulse 1.6s var(--ease) infinite;
+  }
+
+  .badge[data-state='error'] {
+    color: var(--color-ember);
+  }
+
+  .badge #clock {
+    color: var(--color-muted);
+  }
+
+  .badge #clock:not(:empty)::before {
+    content: '/ ';
+  }
+
+  @keyframes pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+
+  .title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    padding-bottom: 0.06em;
+    font-size: var(--text-display);
+    text-wrap: balance;
+  }
+
+  .dial {
+    display: grid;
+    place-items: center;
+    align-self: center;
+    height: 100%;
+    aspect-ratio: 1;
+    margin-right: 6vw;
+  }
+
+  /* The record label at the centre of the ripples; press it to play or pause. */
+  .art {
+    width: 44%;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-full);
+    font-size: clamp(1.5rem, 4vw, 3rem);
+    box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 0.6);
+    transition: scale var(--slow) var(--ease);
+  }
+
+  .art:hover:not(:disabled) {
+    scale: 1.05;
+  }
+
+  .art:disabled {
+    opacity: 0.5;
+  }
+
+  .art-veil {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgb(0 0 0 / 0.5);
+    color: var(--color-text);
+    opacity: 0;
+    transition: opacity var(--fast) var(--ease);
+  }
+
+  .art:hover .art-veil,
+  .art:focus-visible .art-veil,
+  .art:not([data-state='playing'], [data-state='connecting']) .art-veil {
+    opacity: 1;
+  }
+
+  @media (max-width: 47.99rem) {
+    .brand {
+      display: flex;
+    }
+
+    .stage {
+      height: 13rem;
+      padding: var(--space-4);
+      gap: var(--space-3);
+    }
+
+    .dial {
+      margin-right: 0;
+      height: 80%;
+    }
+
+    .art {
+      width: 44%;
+    }
+  }
+</style>

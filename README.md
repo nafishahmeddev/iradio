@@ -1,183 +1,99 @@
-# iRadio
+# iRadio for the web
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-81d4fa)](LICENSE)
-[![CI](https://github.com/nafishahmeddev/iradio/actions/workflows/ci.yml/badge.svg)](https://github.com/nafishahmeddev/iradio/actions/workflows/ci.yml)
+Internet radio from all over the world, with the sound drawn live: a grainy
+WebGL scene where ripples leave the dial, each one the station's real waveform
+from a moment ago.
 
-Browse the world. Tune in. See the sound.
+Built with [Astro](https://astro.build/). The page is prerendered HTML with no
+UI framework. Audio plays straight from each broadcaster, so listening costs
+this server no bandwidth; the server only answers station searches.
 
-A keyboard-driven terminal internet radio player using Radio Browser and mpg123.
-Requires mpg123 with its companion out123, Python 3.9+ and a macOS or Linux terminal. There are no Python runtime dependencies.
+## Run
 
-## Features
-
-- Explore stations by country, name, or genre, with saved favorites.
-- A responsive station library and listening deck with a real PCM waveform.
-- Keyboard navigation, search dialogs, and live playback feedback.
-- Configurable output devices, volume, and optional audio preamp gain.
-- No Python runtime dependencies; macOS and Linux terminal support.
-
-This is an early-stage project. Station availability depends on the external
-directory and broadcasters. Native Windows terminals are not supported.
-
-## Setup
-
-Clone the source repository before running the setup commands:
+Requires Node 22 or newer.
 
 ```sh
-git clone https://github.com/nafishahmeddev/iradio.git
-cd iradio
+cd web
+npm install
+npm run dev          # http://localhost:4321
 ```
 
-
-Install the audio player:
+Production:
 
 ```sh
-# macOS
-brew install mpg123
-# Debian / Ubuntu
-sudo apt install mpg123
+npm run build
+npm start            # HOST and PORT are read from the environment
 ```
 
-Create an isolated Python environment and install the package:
+Start-up options mirror the CLI flags:
+`/?country=IN&search=jazz&volume=60&gain=6`.
 
-```sh
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e .
-iradio
-```
+## Where stations come from
 
-You can also run `python main.py` or, after installation, `python -m iradio`.
-Use a terminal of at least 48 columns and 16 rows; 80×24 or larger shows more detail.
+One search, two catalogues, tried in order:
 
-```sh
-iradio --country IN --volume 60
-iradio --search jazz
-iradio --output alsa --device plughw:0,0
-iradio --favorites-file ./favorites.json
-iradio --help
-iradio --check-country SA
-iradio --check-country BD
-```
+| Catalogue | What it is | Role |
+| --- | --- | --- |
+| [Radio Browser](https://www.radio-browser.info/) | Community directory with a live API; ranks by listener votes. Mirrors are discovered from its DNS records, with failover. | First choice |
+| [International Public Radio Directory](https://github.com/iprd-org/iprd) | Curated, MIT-licensed catalogue of about 25,000 stations in 225 countries, published as a file on static hosting. Loaded into memory, refreshed daily, copied to disk for restarts. | Used whenever Radio Browser does not answer |
 
-Audio uses out123's system default output unless explicitly configured. The directory
-filters for MP3 stations. Network requests run in the background with server failover;
-changing views discards outdated responses. Playback state and decoded elapsed time come from mpg123's remote protocol. The
-waveform uses actual signed PCM samples from the same decoder that feeds out123
-for playback. It is a waveform, not a frequency spectrum. Stereo audio is mixed
-to mono for display; playback remains stereo. Braille cells provide four vertical
-pixels per terminal row. Automatic display gain (up to 8×) makes quieter audio
-visible without changing playback volume; gain recovers gradually after loud peaks. Pauses and stale audio show a flat line.
-Live streams have no fixed duration, so the timer shows elapsed time alongside LIVE.
-Loading uses a spinner and moving activity bar rather than an estimated percentage.
-At 100 columns or more, a station library and listening deck sit side by side.
-Narrower terminals stack the panels; compact layouts retain a waveform and volume
-control. The listening deck shows playback state, station details and a violet PCM
-waveform. Long station titles scroll. Search, country selection and keyboard help
-open centered dialogs. Use 110×30 or larger for the full listening deck.
+Browsing is organised the same way whichever one answers: every country,
+grouped by continent with a filter; a genre picker; search by name; saved
+stations. Without a popularity ranking the second catalogue shows "Around the
+world", the best-documented stations of each country in turn.
 
+## How audio plays
 
-## Controls
+Each station is tried in this order:
 
-| Key | Action |
-| --- | --- |
-| ↑ / ↓ or k / j | Select station |
-| Enter | Play |
-| Space | Pause / resume |
-| + / - | Adjust volume |
-| / | Search station names |
-| C | Choose a country from a visible list |
-| G | Search a genre |
-| F | Toggle selected favorite |
-| B | Show favorites |
-| T | Top worldwide stations |
-| [ / ] | Previous / next page |
-| R | Refresh current directory page |
-| S | Stop |
-| ? | Open scrollable keyboard help |
-| Q | Quit |
-| Esc | Cancel search or country selection |
+1. **Direct, readable.** Most broadcasters allow other sites to read their
+   audio (CORS). The stream runs through the Web Audio graph: the ripples
+   carry the real waveform, and the boost control works.
+2. **Direct, private.** The station plays, but the browser keeps its samples
+   from the page. The ripples move in a slow, even swell that is plainly not
+   the audio, and boost is disabled with the reason shown.
+3. **Relay (off by default).** Build with `PUBLIC_STREAM_RELAY=fallback` and a
+   station that cannot play directly is fetched through `/api/stream`. That
+   spends this server's bandwidth, about 58 MB per listener-hour at 128 kbps.
+   The relay only fetches public addresses, only passes audio through, and
+   refuses requests from other sites.
 
-Favorites retain the prototype's `~/.haaki_radio_favorites.json` location and are
-saved with atomic replacement. Read errors appear in the UI; save errors do not
-change the in-memory favorites.
+On an `https://` page a browser will not load `http://` audio. With the relay
+off, searches leave those stations out rather than list what cannot play.
 
-## Project layout
+## Differences from the terminal app
+
+- Saved stations and volume are kept in the browser's `localStorage`; favorites
+  in `~/.haaki_radio_favorites.json` are not imported.
+- Audio plays on the system's default output. `--output` and `--device` have
+  no equivalent.
+- Resuming after a pause longer than 15 seconds rejoins the live broadcast.
+
+## Layout
 
 ```text
-main.py                 Compatibility launcher
-pyproject.toml          Package metadata, CLI entry point, development tools
-src/iradio/
-  __init__.py           Package version
-  __main__.py           python -m iradio entry point
-  cli.py                Arguments and startup checks
-  config.py             Defaults and country shortcuts
-  api.py                Station directory transport
-  favorites.py          Persistent favorites
-  player.py             Decoder, PCM forwarding, audio process lifecycle
-  waveform.py           Signed PCM waveform rendering
-  view.py               Responsive panels and visual theme
-  ui.py                 Terminal UI and input handling
-tests/                  Offline behavioral tests
+src/
+  pages/index.astro       The page and its dialogs
+  pages/api/              stations.ts (search), stream.ts (optional relay)
+  components/             Rail, Stage, Browser, PlayerBar, Dialog, Slider, Icon
+  styles/tokens.css       Design tokens; the WebGL scene reads its colours here
+  lib/                    Pure logic shared by server, client and tests
+  server/                 radio-browser.ts, catalogue.ts, stations.ts, relay.ts
+  scripts/                app.ts (interface), player.ts (audio), scene.ts (WebGL)
+tests/                    Offline tests; the relay is tested against local servers
 ```
 
-## Development
+## Develop
 
 ```sh
-python -m pip install -e '.[dev]'
-python -m unittest discover -s tests -v
-ruff check .
-ruff format --check .
-python -m build
-python -m twine check dist/*
+npm run check        # types, including .astro files
+npm test
+npm run build
 ```
 
-Tests use temporary files and mocked network/audio calls. Live streaming needs an
-internet connection and an installed mpg123 player. Native Windows terminals are
-not supported by this curses interface.
+## Credits
 
-## Diagnosing country loading
-
-Run `iradio --check-country SA` or `iradio --check-country BD` to test the same
-directory request without the terminal UI or audio playback. A network failure
-is reported separately from an empty result; in the app press R to retry. Results
-are MP3-only and capped at 50 per page. A directory listing does not guarantee
-that every station stream is online.
-
-## Quiet audio / MAX98357A
-
-The app starts at 70% software volume. First try `iradio --volume 100`.
-For an ALSA/I²S setup, select your configured device explicitly:
-
-```sh
-iradio --output alsa --device plughw:0,0 --volume 100
-```
-
-If the stream is still quiet, add an audio preamp:
-
-```sh
-iradio --output alsa --device plughw:0,0 --volume 100 --gain-db 6
-```
-
-Use the device identifier from your working speaker test; `plughw:0,0` is an
-example. Audio gain is adjustable from 0 to 12 dB and uses soft clipping. Reduce
-it if sound distorts. This changes actual playback amplitude; waveform display
-gain only changes the drawing. The app does not adjust the system ALSA mixer.
-
-## Contributing and support
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, validation, and PR guidance.
-Use [GitHub issues](https://github.com/nafishahmeddev/iradio/issues) for bugs and
-feature requests. Follow the [code of conduct](CODE_OF_CONDUCT.md). Report
-vulnerabilities according to [SECURITY.md](SECURITY.md). See
-[CHANGELOG.md](CHANGELOG.md) for changes.
-
-## License and acknowledgments
-
-Licensed under the [MIT License](LICENSE).
-
-Station discovery is provided by [Radio Browser](https://www.radio-browser.info/).
-Audio decoding and output use [mpg123 and out123](https://www.mpg123.de/), installed
-separately under their own licenses. The iRadio license covers this repository's
-code; it does not grant rights to third-party audio broadcasts.
+Icons: [Phosphor](https://phosphoricons.com/) (MIT). Type: [Archivo](https://github.com/Omnibus-Type/Archivo) (OFL).
+Station data: [Radio Browser](https://www.radio-browser.info/) and the
+[International Public Radio Directory](https://github.com/iprd-org/iprd) (MIT).
+The iRadio license covers this code, not third-party broadcasts.

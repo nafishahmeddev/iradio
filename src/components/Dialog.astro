@@ -1,0 +1,73 @@
+---
+import Icon from './Icon.astro';
+
+interface Props {
+  id: string;
+  title: string;
+}
+
+const { id, title } = Astro.props;
+---
+
+<dialog class="dialog glass" id={id} aria-labelledby={`${id}-title`}>
+  <header>
+    <h2 class="display" id={`${id}-title`}>{title}</h2>
+    <form method="dialog">
+      <button class="icon-button" aria-label="Close"><Icon name="close" /></button>
+    </form>
+  </header>
+  <slot />
+</dialog>
+
+<style>
+  .dialog {
+    width: min(38rem, calc(100vw - 2 * var(--space-4)));
+    max-height: min(44rem, calc(100dvh - 2 * var(--space-5)));
+    padding: var(--space-5);
+    color: var(--color-text);
+    overflow: hidden;
+  }
+
+  .dialog[open] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    animation: rise var(--slow) var(--ease);
+  }
+
+  .dialog::backdrop {
+    background: var(--scrim);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    animation: fade var(--slow) var(--ease);
+  }
+
+  .dialog:focus-visible {
+    outline: 0;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+  }
+
+  h2 {
+    font-size: var(--text-lg);
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      translate: 0 0.75rem;
+      scale: 0.98;
+    }
+  }
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+  }
+</style>

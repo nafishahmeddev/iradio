@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "iradio",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  // The built site. Cloudflare serves these files itself; only /api/* runs the Worker.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "not_found_handling": "404-page"
+  },
+  "observability": { "enabled": true }
+}

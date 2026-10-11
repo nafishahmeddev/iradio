@@ -1,0 +1,60 @@
+/*
+ * Design tokens. True black, warm white type, and three lights: amber for
+ * what is on air, coral and violet for depth. The WebGL scene reads the
+ * --color-* hex values, so they stay plain hex.
+ */
+:root {
+  color-scheme: dark;
+
+  --color-ink: #08080a;
+  --color-text: #f5f2ec;
+  --color-muted: #9b978f;
+  --color-amber: #ffb454;
+  --color-ember: #ff5f4a;
+  --color-cool: #7b61ff;
+  --color-on-light: #0b0b0d;
+
+  --surface: rgb(255 255 255 / 0.045);
+  --surface-strong: rgb(255 255 255 / 0.09);
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.2);
+  --glass: rgb(14 14 18 / 0.62);
+  --scrim: rgb(4 4 6 / 0.7);
+
+  /*
+   * One family at three widths: expanded and heavy for titles, condensed
+   * capitals for labels, normal for everything else.
+   */
+  --font: 'Archivo Variable', 'Helvetica Neue', Arial, sans-serif;
+  --width-display: 125%;
+  --width-label: 78%;
+  --weight-display: 800;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.5rem;
+  --text-display: clamp(2rem, 0.6rem + 4.2vw, 5.25rem);
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --radius-sm: 0.875rem;
+  --radius-lg: 1.75rem;
+  --radius-full: 999px;
+  --control: 2.75rem;
+  --control-lg: 4.25rem;
+  --logo: 2.75rem;
+  --rail: 4.5rem;
+
+  --blur: blur(32px) saturate(1.4);
+  --shadow: 0 2rem 5rem rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --shadow-button: 0 0.75rem 2.5rem rgb(255 180 84 / 0.28);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --fast: 160ms;
+  --slow: 420ms;
+}

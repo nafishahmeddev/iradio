@@ -1,0 +1,258 @@
+---
+import Browser from '../components/Browser.astro';
+import Dialog from '../components/Dialog.astro';
+import Icon from '../components/Icon.astro';
+import PlayerBar from '../components/PlayerBar.astro';
+import Rail from '../components/Rail.astro';
+import Stage from '../components/Stage.astro';
+import Base from '../layouts/Base.astro';
+import { KEYS } from '../lib/keys';
+import { GENRES, WORLD } from '../lib/world';
+---
+
+<Base
+  title="iRadio"
+  description="Browse the world. Tune in. See the sound. Internet radio with a live WebGL waveform."
+>
+  <canvas class="scene" id="scene" aria-hidden="true"></canvas>
+
+  <div class="app">
+    <Rail />
+    <Stage />
+    <Browser />
+    <PlayerBar />
+  </div>
+
+  <p class="toast glass" id="toast" role="status"></p>
+
+  <Dialog id="country-dialog" title="Explore the world">
+    <label class="field">
+      <Icon name="search" size={18} />
+      <span class="visually-hidden">Filter countries</span>
+      <input type="text" id="country-filter" placeholder="Type a country" autocomplete="off" spellcheck="false" />
+    </label>
+    <div class="world" id="countries">
+      {
+        WORLD.map((region) => (
+          <section class="region">
+            <h3 class="label muted">{region.name}</h3>
+            <ul>
+              {region.countries.map(({ code, name }) => (
+                <li>
+                  <button type="button" class="country" data-code={code} data-name={name}>
+                    <span class="label muted">{code}</span>
+                    <span class="clip">{name}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))
+      }
+      <p class="muted" id="country-none" hidden>No country by that name.</p>
+    </div>
+  </Dialog>
+
+  <Dialog id="genre-dialog" title="Pick a genre">
+    <ul class="genres" id="genres">
+      {
+        GENRES.map((genre) => (
+          <li>
+            <button type="button" class="chip" data-genre={genre}>
+              {genre}
+            </button>
+          </li>
+        ))
+      }
+    </ul>
+    <form method="dialog" id="genre-form">
+      <label class="field">
+        <Icon name="genres" size={18} />
+        <span class="visually-hidden">Another genre</span>
+        <input
+          type="text"
+          id="genre-input"
+          placeholder="Or type another, like bossa nova"
+          maxlength="100"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          enterkeyhint="search"
+        />
+      </label>
+    </form>
+  </Dialog>
+
+  <Dialog id="help-dialog" title="Keyboard">
+    <dl class="help">
+      {
+        KEYS.map(([keys, action]) => (
+          <div>
+            <dt>{keys.split(' ').map((key) => <kbd class="keycap">{key}</kbd>)}</dt>
+            <dd class="muted">{action}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </Dialog>
+</Base>
+
+<script>
+  import '../scripts/app';
+</script>
+
+<style>
+  .scene {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    /* Shown until WebGL draws, and instead of it where WebGL is unavailable. */
+    background:
+      radial-gradient(50rem 36rem at 70% 25%, rgb(255 95 74 / 0.16), transparent 70%),
+      radial-gradient(40rem 30rem at 85% 55%, rgb(123 97 255 / 0.12), transparent 70%), var(--color-ink);
+  }
+
+  /* Rail down the side, stage over the station grid, player bar along the bottom. */
+  .app {
+    position: relative;
+    display: grid;
+    grid-template:
+      'rail stage' auto
+      'rail browser' minmax(0, 1fr)
+      'bar bar' auto / auto minmax(0, 1fr);
+    height: 100dvh;
+  }
+
+  @media (max-width: 47.99rem) {
+    .app {
+      grid-template:
+        'stage' auto
+        'rail' auto
+        'browser' minmax(0, 1fr)
+        'bar' auto / minmax(0, 1fr);
+    }
+  }
+
+  /* A short message that drops in at the top and leaves on its own. */
+  .toast {
+    position: fixed;
+    left: 50%;
+    top: var(--space-4);
+    max-width: calc(100vw - 2 * var(--space-4));
+    padding: var(--space-3) var(--space-5);
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm);
+    translate: -50% -1rem;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity var(--slow) var(--ease),
+      translate var(--slow) var(--ease);
+  }
+
+  .toast:global(.is-showing) {
+    translate: -50% 0;
+    opacity: 1;
+  }
+
+  /* Without WebGL there are no ripples, so the dial draws a ring of its own. */
+  :global(.no-webgl) :global(.dial) {
+    border-radius: var(--radius-full);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+
+  .genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .genres .chip {
+    text-transform: capitalize;
+  }
+
+  .world {
+    display: grid;
+    gap: var(--space-5);
+    margin-inline: calc(-1 * var(--space-2));
+    padding-inline: var(--space-2);
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .region h3 {
+    position: sticky;
+    top: 0;
+    margin-bottom: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    background: linear-gradient(rgb(14 14 18), rgb(14 14 18 / 0.85));
+  }
+
+  .region ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 2px;
+  }
+
+  .region[hidden],
+  .region li[hidden] {
+    display: none;
+  }
+
+  .country {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: 0.625rem;
+    background: none;
+    text-align: left;
+    transition: background var(--fast) var(--ease);
+  }
+
+  .country .label {
+    width: 2ch;
+  }
+
+  .country:hover,
+  .country:focus-visible {
+    background: var(--surface-strong);
+  }
+
+  .help {
+    display: grid;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .help div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding-block: var(--space-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .help div:last-child {
+    border-bottom: 0;
+  }
+
+  .help dt {
+    display: flex;
+    gap: var(--space-1);
+    order: 2;
+  }
+
+  @media (pointer: coarse) {
+    .country {
+      min-height: var(--control);
+    }
+  }
+</style>

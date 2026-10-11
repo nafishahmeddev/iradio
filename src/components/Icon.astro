@@ -1,0 +1,57 @@
+---
+/**
+ * Icons from Phosphor (https://phosphoricons.com), Light weight. The filled
+ * drawings are used only where a control is solid or switched on.
+ */
+import refresh from '@phosphor-icons/core/assets/light/arrow-clockwise-light.svg?raw';
+import previous from '@phosphor-icons/core/assets/light/caret-left-light.svg?raw';
+import next from '@phosphor-icons/core/assets/light/caret-right-light.svg?raw';
+import globe from '@phosphor-icons/core/assets/light/globe-hemisphere-west-light.svg?raw';
+import heart from '@phosphor-icons/core/assets/light/heart-light.svg?raw';
+import keyboard from '@phosphor-icons/core/assets/light/keyboard-light.svg?raw';
+import boost from '@phosphor-icons/core/assets/light/lightning-light.svg?raw';
+import search from '@phosphor-icons/core/assets/light/magnifying-glass-light.svg?raw';
+import genres from '@phosphor-icons/core/assets/light/music-notes-light.svg?raw';
+import skipBack from '@phosphor-icons/core/assets/light/skip-back-light.svg?raw';
+import skipNext from '@phosphor-icons/core/assets/light/skip-forward-light.svg?raw';
+import volume from '@phosphor-icons/core/assets/light/speaker-high-light.svg?raw';
+import top from '@phosphor-icons/core/assets/light/trend-up-light.svg?raw';
+import close from '@phosphor-icons/core/assets/light/x-light.svg?raw';
+import heartFill from '@phosphor-icons/core/assets/fill/heart-fill.svg?raw';
+import boostFill from '@phosphor-icons/core/assets/fill/lightning-fill.svg?raw';
+import pause from '@phosphor-icons/core/assets/fill/pause-fill.svg?raw';
+import play from '@phosphor-icons/core/assets/fill/play-fill.svg?raw';
+
+const ICONS = {
+  refresh,
+  previous,
+  next,
+  globe,
+  heart,
+  keyboard,
+  boost,
+  search,
+  genres,
+  'skip-back': skipBack,
+  'skip-next': skipNext,
+  volume,
+  top,
+  close,
+  'heart-fill': heartFill,
+  'boost-fill': boostFill,
+  pause,
+  play,
+} as const;
+
+interface Props {
+  name: keyof typeof ICONS;
+  size?: number;
+  class?: string;
+}
+
+const { name, size = 22, class: className } = Astro.props;
+const attributes = `width="${size}" height="${size}" aria-hidden="true"${className ? ` class="${className}"` : ''}`;
+const svg = ICONS[name].replace('<svg ', `<svg ${attributes} `);
+---
+
+<Fragment set:html={svg} />

@@ -1,0 +1,187 @@
+---
+import { DEFAULT_VOLUME, VOLUME_STEP } from '../lib/config';
+import Icon from './Icon.astro';
+import Slider from './Slider.astro';
+---
+
+<footer class="bar glass" aria-label="Player">
+  <div class="track">
+    <span class="logo" id="bar-art">
+      <span id="bar-mono" aria-hidden="true"></span>
+      <img id="bar-image" alt="" referrerpolicy="no-referrer" />
+    </span>
+    <div class="track-text">
+      <p class="track-title clip" id="bar-title">Nothing playing</p>
+      <p class="label muted clip" id="bar-meta">Pick a station</p>
+    </div>
+  </div>
+
+  <div class="transport">
+    <button type="button" class="icon-button" data-action="previous-station" aria-label="Previous station">
+      <Icon name="skip-back" />
+    </button>
+    <button type="button" class="play swap" id="toggle" data-action="toggle" data-state="idle">
+      <Icon name="play" size={22} class="show-play" />
+      <Icon name="pause" size={22} class="show-pause" />
+      <span class="play-spinner" aria-hidden="true"></span>
+    </button>
+    <button type="button" class="icon-button" data-action="next-station" aria-label="Next station">
+      <Icon name="skip-next" />
+    </button>
+  </div>
+
+  <div class="extras">
+    <button type="button" class="icon-button" data-action="favorite-current" aria-label="Save this station">
+      <Icon name="heart" class="when-off" />
+      <Icon name="heart-fill" class="when-on" />
+    </button>
+    <button type="button" class="icon-button boost" id="boost" data-action="boost">
+      <Icon name="boost" class="when-off" />
+      <Icon name="boost-fill" class="when-on" />
+      <span class="boost-value label" id="boost-value"></span>
+    </button>
+    <div class="volume">
+      <Slider id="volume" label="Volume" min={0} max={100} step={VOLUME_STEP} value={DEFAULT_VOLUME} />
+    </div>
+  </div>
+</footer>
+
+<style>
+  .bar {
+    grid-area: bar;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: var(--space-4);
+    margin: 0 var(--space-3) var(--space-3);
+    padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+    border-radius: 1.5rem;
+  }
+
+  .track {
+    --logo: 3.25rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .track .logo {
+    border-radius: 1rem;
+    font-size: 1.25rem;
+  }
+
+  .track-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .track-title {
+    font-weight: 600;
+  }
+
+  .transport,
+  .extras {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .extras {
+    justify-content: end;
+  }
+
+  .play {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 3.25rem;
+    height: 3.25rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--color-text);
+    color: var(--color-on-light);
+    transition:
+      scale var(--fast) var(--ease),
+      opacity var(--fast) var(--ease);
+  }
+
+  .play:hover:not(:disabled) {
+    scale: 1.06;
+  }
+
+  .play:active:not(:disabled) {
+    scale: 0.96;
+  }
+
+  .play:disabled {
+    opacity: 0.3;
+  }
+
+  .play-spinner {
+    position: absolute;
+    inset: -0.3125rem;
+    border: 1.5px solid transparent;
+    border-top-color: var(--color-amber);
+    border-radius: var(--radius-full);
+    opacity: 0;
+    transition: opacity var(--fast);
+  }
+
+  .play[data-state='connecting'] .play-spinner {
+    opacity: 1;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      rotate: 1turn;
+    }
+  }
+
+  /* Boost shows its level as a small tag once it is on. */
+  .boost {
+    position: relative;
+  }
+
+  .boost-value {
+    position: absolute;
+    top: 0;
+    right: -0.375rem;
+    padding: 0 0.3125rem;
+    border-radius: var(--radius-full);
+    background: var(--color-amber);
+    color: var(--color-on-light);
+    font-size: 0.625rem;
+    letter-spacing: 0;
+  }
+
+  .boost-value:empty {
+    display: none;
+  }
+
+  .volume {
+    width: 12rem;
+  }
+
+  @media (max-width: 63.99rem) {
+    .volume {
+      display: none;
+    }
+  }
+
+  @media (max-width: 47.99rem) {
+    .bar {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: var(--space-2);
+      padding-right: var(--space-2);
+    }
+
+    .transport [data-action='previous-station'],
+    .boost {
+      display: none;
+    }
+  }
+</style>

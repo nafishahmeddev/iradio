@@ -1,0 +1,30 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Not found · iRadio" description="That page is not on the dial.">
+  <main>
+    <p class="label muted">404</p>
+    <h1 class="display">Nothing on this frequency.</h1>
+    <a class="chip" href="/">Back to the radio</a>
+  </main>
+</Base>
+
+<style>
+  main {
+    display: grid;
+    place-content: center;
+    justify-items: start;
+    gap: var(--space-4);
+    min-height: 100dvh;
+    padding: var(--space-6);
+  }
+
+  h1 {
+    font-size: var(--text-display);
+  }
+
+  a {
+    text-decoration: none;
+  }
+</style>

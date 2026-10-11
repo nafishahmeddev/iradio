@@ -1,0 +1,352 @@
+---
+import Icon from './Icon.astro';
+---
+
+<section class="browser" aria-labelledby="mode">
+  <header class="heading">
+    <div class="where">
+      <h2 class="display clip" id="mode">Top worldwide</h2>
+      <p class="label muted" id="count"></p>
+    </div>
+
+    <div class="pager" id="pager">
+      <button type="button" class="icon-button" data-action="previous" aria-label="Previous page">
+        <Icon name="previous" size={18} />
+      </button>
+      <span class="label muted" id="page">1</span>
+      <button type="button" class="icon-button" data-action="next" aria-label="Next page">
+        <Icon name="next" size={18} />
+      </button>
+    </div>
+
+    <label class="field search" for="search-input">
+      <Icon name="search" size={18} />
+      <span class="visually-hidden">Search stations by name</span>
+      <input
+        type="text"
+        id="search-input"
+        placeholder="Search stations"
+        maxlength="100"
+        autocomplete="off"
+        autocapitalize="off"
+        spellcheck="false"
+        enterkeyhint="search"
+      />
+      <kbd>/</kbd>
+    </label>
+  </header>
+
+  <ul class="grid" id="stations" role="listbox" tabindex="0" aria-labelledby="mode"></ul>
+
+  <ul class="grid skeleton" id="skeleton" aria-hidden="true" hidden>
+    {
+      Array.from({ length: 14 }, () => (
+        <li>
+          <span class="logo" />
+          <span class="bar" />
+        </li>
+      ))
+    }
+  </ul>
+
+  <div class="empty" id="empty" hidden>
+    <p class="display empty-title" id="empty-title"></p>
+    <p class="muted" id="empty-hint"></p>
+    <button type="button" class="chip" id="retry" data-action="refresh">
+      <Icon name="refresh" size={18} />Try again
+    </button>
+  </div>
+</section>
+
+<template id="station-template">
+  <li class="card" role="option" aria-selected="false">
+    <span class="logo">
+      <span class="logo-mono" aria-hidden="true"></span>
+      <img alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+      <span class="card-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    </span>
+    <span class="card-name clip"></span>
+    <span class="card-meta label muted clip"></span>
+    <button type="button" class="icon-button card-fav" tabindex="-1">
+      <Icon name="heart" size={18} class="when-off" />
+      <Icon name="heart-fill" size={18} class="when-on" />
+    </button>
+  </li>
+</template>
+
+<style>
+  .browser {
+    grid-area: browser;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+    min-height: 0;
+    padding: var(--space-4) var(--space-6) 0;
+  }
+
+  .heading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .where {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-4);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .where h2 {
+    font-size: var(--text-lg);
+    padding-block: 0.1em;
+  }
+
+  #count {
+    flex: none;
+  }
+
+  .pager {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .pager[hidden] {
+    display: none;
+  }
+
+  .search {
+    width: min(20rem, 34vw);
+  }
+
+  .grid {
+    --logo: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(8.75rem, 1fr));
+    align-content: start;
+    gap: var(--space-2);
+    flex: 1;
+    min-height: 0;
+    margin-inline: calc(-1 * var(--space-3));
+    padding: var(--space-1) var(--space-3) var(--space-5);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transition: opacity var(--fast) var(--ease);
+    /* Cards fade out under the player bar rather than being cut by it. */
+    mask-image: linear-gradient(#000 calc(100% - 2rem), transparent);
+  }
+
+  .grid:focus-visible {
+    outline: 0;
+  }
+
+  .card,
+  .skeleton li {
+    position: relative;
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: var(--space-3);
+    border-radius: 1.25rem;
+  }
+
+  .card {
+    cursor: pointer;
+    transition:
+      background var(--fast) var(--ease),
+      translate var(--slow) var(--ease);
+    animation: arrive var(--slow) var(--ease) backwards;
+    animation-delay: calc(min(var(--order, 0), 18) * 16ms);
+  }
+
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      translate: 0 0.75rem;
+    }
+  }
+
+  .card:hover {
+    background: var(--surface);
+    translate: 0 -2px;
+  }
+
+  .card[aria-selected='true'] {
+    background: var(--surface-strong);
+  }
+
+  .grid:focus-visible .card[aria-selected='true'] {
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+  }
+
+  .card .logo,
+  .skeleton .logo {
+    margin-bottom: var(--space-2);
+    border-radius: 0.875rem;
+    font-size: 2.25rem;
+  }
+
+  .card[data-playing] .logo {
+    outline: 1.5px solid var(--color-amber);
+    outline-offset: 3px;
+  }
+
+  .card-name {
+    font-weight: 600;
+  }
+
+  .card[data-playing] .card-name {
+    color: var(--color-amber);
+  }
+
+  .card-meta {
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+  }
+
+  /* Equaliser bars over the artwork mark the station on air. */
+  .card-eq {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: end;
+    justify-content: center;
+    gap: 3px;
+    padding-bottom: 22%;
+    background: rgb(0 0 0 / 0.55);
+    color: var(--color-amber);
+  }
+
+  .card[data-playing] .card-eq {
+    display: flex;
+  }
+
+  .card-eq i {
+    width: 3px;
+    height: 28%;
+    border-radius: 2px;
+    background: currentColor;
+    transform-origin: bottom;
+    animation: eq 0.8s ease-in-out infinite alternate;
+  }
+
+  .card-eq i:nth-child(2) {
+    animation-delay: -0.5s;
+  }
+
+  .card-eq i:nth-child(3) {
+    animation-delay: -0.2s;
+  }
+
+  .card-eq i:nth-child(4) {
+    animation-delay: -0.65s;
+  }
+
+  @keyframes eq {
+    from {
+      scale: 1 0.2;
+    }
+  }
+
+  .card-fav {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    width: 2rem;
+    height: 2rem;
+    background: rgb(0 0 0 / 0.55);
+    color: var(--color-text);
+    opacity: 0;
+  }
+
+  .card-fav:hover:not(:disabled) {
+    background: rgb(0 0 0 / 0.75);
+  }
+
+  .card:hover .card-fav,
+  .card[aria-selected='true'] .card-fav,
+  .card-fav[data-on] {
+    opacity: 1;
+  }
+
+  @media (pointer: coarse) {
+    .card-fav {
+      opacity: 1;
+    }
+  }
+
+  .skeleton .logo,
+  .skeleton .bar {
+    background: var(--surface-strong);
+    animation: breathe 1.2s var(--ease) infinite alternate;
+  }
+
+  .skeleton .bar {
+    width: 70%;
+    height: 0.75rem;
+    border-radius: var(--radius-full);
+  }
+
+  @keyframes breathe {
+    to {
+      opacity: 0.35;
+    }
+  }
+
+  .empty {
+    flex: 1;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: var(--space-2);
+    padding: var(--space-5);
+    text-align: center;
+  }
+
+  .empty-title {
+    font-size: var(--text-lg);
+  }
+
+  .empty .chip {
+    margin-top: var(--space-3);
+  }
+
+  .grid[hidden],
+  .empty[hidden],
+  .empty .chip[hidden] {
+    display: none;
+  }
+
+  @media (max-width: 47.99rem) {
+    .browser {
+      padding: var(--space-3) var(--space-4) 0;
+    }
+
+    .heading {
+      flex-wrap: wrap;
+      gap: var(--space-2) var(--space-3);
+    }
+
+    .search {
+      order: -1;
+      width: 100%;
+    }
+
+    /* The title needs the room more than the count does. */
+    #count {
+      display: none;
+    }
+
+    .grid {
+      grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+      gap: 0;
+    }
+
+    .card {
+      padding: var(--space-2);
+    }
+  }
+</style>
