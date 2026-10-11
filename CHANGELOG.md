@@ -2,16 +2,11 @@
 
 ## Unreleased
 
-Initial project preparation; no tagged release or PyPI publication is claimed.
-
-- Installable Python package and `iradio` command.
-- Country, station-name, and genre search with directory server failover.
-- Persistent favorites and paginated browsing.
-- mpg123 decoding with out123 audio output and configurable backend/device.
-- Volume and optional audio preamp controls.
-- Real PCM waveform with automatic display gain.
-- Responsive station library, listening deck, and centered dialogs.
-- Offline behavioral tests, package validation, and Linux/macOS CI.
-- Browser version in `web/`: Astro app with a WebGL scene driven by the stream's
-  real audio, direct playback from broadcasters, and station search across
-  Radio Browser and the International Public Radio Directory.
+- iRadio is now a web app. The terminal player (Python, curses, mpg123) was
+  removed; it remains in the repository history.
+- Astro static site with a WebGL scene driven by the stream's real audio.
+- Hono API on a Cloudflare Worker; the site is served as static assets.
+- Station search across Radio Browser and the International Public Radio
+  Directory, with every country and a genre picker.
+- Audio plays directly from broadcasters.
+- Installable as a Progressive Web App, with an offline-capable shell.

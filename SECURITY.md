@@ -18,8 +18,10 @@ There is no guaranteed response deadline or bounty program.
 
 ## External services and local data
 
-The app requests station listings from Radio Browser and opens selected streams
-with mpg123. Stations and directory responses are external data; listing a
-station does not imply that its stream is trusted or available. Favorites are
-stored locally and may contain stream URLs. Keep mpg123 and out123 updated
-through your system package manager. The project does not bundle either binary.
+The app requests station listings from Radio Browser and the International
+Public Radio Directory, and the browser opens the selected stream directly from
+its broadcaster. Stations, artwork and directory responses are external data;
+listing a station does not imply that its stream is trusted or available. The
+Worker treats every directory record as untrusted and passes on only validated
+http(s) addresses and plain text. Saved stations are stored in the browser and
+may contain stream addresses.

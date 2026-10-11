@@ -334,6 +334,7 @@ const actions: Record<string, () => void> = {
   country: openCountries,
   top: () => browse('top', TOP, {}),
   help: () => view.helpDialog.showModal(),
+  install: () => void install(),
   next: () => paging() && state.more && load(state.offset + PAGE_SIZE),
   previous: () => paging() && state.offset > 0 && load(Math.max(0, state.offset - PAGE_SIZE)),
   refresh: () => paging() && load(state.offset),
@@ -444,7 +445,10 @@ function renderLibrary(): void {
   view.skeleton.hidden = !waiting;
   view.empty.hidden = count > 0 || state.loading;
   view.retry.hidden = !state.loadError;
-  if (state.loadError) {
+  if (state.loadError && !navigator.onLine) {
+    view.emptyTitle.textContent = 'You are offline';
+    view.emptyHint.textContent = 'Stations will load as soon as you are connected again.';
+  } else if (state.loadError) {
     view.emptyTitle.textContent = 'The station catalogues are not answering';
     view.emptyHint.textContent = 'Check your connection, then try again.';
   } else if (state.kind === 'saved') {
@@ -705,6 +709,44 @@ if ('mediaSession' in navigator) {
   navigator.mediaSession.setActionHandler('pause', pause);
   navigator.mediaSession.setActionHandler('stop', () => player.stop());
 }
+
+// ---------------------------------------------------------------- installed app
+
+/** The browser's offer to install, kept until the person asks for it. */
+interface InstallPrompt extends Event {
+  prompt: () => Promise<unknown>;
+}
+
+let installPrompt: InstallPrompt | null = null;
+
+/** The install buttons exist only while the browser is actually offering an install. */
+function offerInstall(prompt: InstallPrompt | null): void {
+  installPrompt = prompt;
+  for (const button of document.querySelectorAll<HTMLElement>('[data-action="install"]')) {
+    button.hidden = prompt === null;
+  }
+}
+
+async function install(): Promise<void> {
+  const prompt = installPrompt;
+  if (!prompt) return;
+  offerInstall(null);
+  await prompt.prompt();
+}
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  offerInstall(event as InstallPrompt);
+});
+window.addEventListener('appinstalled', () => offerInstall(null));
+
+// The service worker keeps the app's own files; skipped in development, where files change constantly.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => void navigator.serviceWorker.register('/sw.js'));
+}
+
+// Back online: load what could not be loaded.
+window.addEventListener('online', () => state.loadError && state.kind !== 'saved' && load(state.offset));
 
 // -------------------------------------------------------------------- start
 

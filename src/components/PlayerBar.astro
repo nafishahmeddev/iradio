@@ -53,7 +53,7 @@ import Slider from './Slider.astro';
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     gap: var(--space-4);
-    margin: 0 var(--space-3) var(--space-3);
+    margin: 0 var(--space-3) max(var(--space-3), env(safe-area-inset-bottom));
     padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
     border-radius: 1.5rem;
   }

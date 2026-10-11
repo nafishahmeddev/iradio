@@ -1,32 +1,55 @@
-# iRadio for the web
+# iRadio
 
-Internet radio from all over the world, with the sound drawn live: a grainy
-WebGL scene where ripples leave the dial, each one the station's real waveform
-from a moment ago.
+[![License: MIT](https://img.shields.io/badge/license-MIT-ffb454)](LICENSE)
+[![CI](https://github.com/nafishahmeddev/iradio/actions/workflows/ci.yml/badge.svg)](https://github.com/nafishahmeddev/iradio/actions/workflows/ci.yml)
 
-Built with [Astro](https://astro.build/). The page is prerendered HTML with no
-UI framework. Audio plays straight from each broadcaster, so listening costs
-this server no bandwidth; the server only answers station searches.
+Browse the world. Tune in. See the sound.
+
+Internet radio from every country, in the browser. Around the station's artwork
+a WebGL scene draws ripples, each one the stream's real waveform from a moment
+ago. It installs as an app on phones and desktops.
+
+## How it is built
+
+| Part | What | Where |
+| --- | --- | --- |
+| Site | [Astro](https://astro.build/), built to static files; no UI framework | `src/` |
+| API | [Hono](https://hono.dev/) on a Cloudflare Worker; one route, station search | `worker/` |
+| Hosting | Cloudflare serves the static files itself; only `/api/*` runs the Worker | `wrangler.jsonc` |
+| Audio | Plays straight from each broadcaster, so listening uses none of your bandwidth | `src/scripts/player.ts` |
 
 ## Run
 
 Requires Node 22 or newer.
 
 ```sh
-cd web
 npm install
-npm run dev          # http://localhost:4321
+npm run dev
 ```
 
-Production:
+Open http://localhost:4321. `npm run dev` builds once, then runs the site with
+live reload and the Worker beside it on port 8787; the site passes `/api`
+requests to the Worker.
 
-```sh
-npm run build
-npm start            # HOST and PORT are read from the environment
-```
+`npm run preview` serves the production build exactly as Cloudflare will,
+service worker included, on http://localhost:8787.
 
-Start-up options mirror the CLI flags:
-`/?country=IN&search=jazz&volume=60&gain=6`.
+## Deploy to Cloudflare
+
+Connect the repository under **Workers & Pages → Create → Import a repository**
+and set:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+
+Every push then builds and deploys on Cloudflare. To deploy from your own
+machine instead: `npx wrangler login` once, then `npm run deploy`.
+
+The build downloads the second station catalogue and writes it into the site
+as about 1,300 small files, so it needs network access (Cloudflare's builds
+have it).
 
 ## Where stations come from
 
@@ -35,65 +58,83 @@ One search, two catalogues, tried in order:
 | Catalogue | What it is | Role |
 | --- | --- | --- |
 | [Radio Browser](https://www.radio-browser.info/) | Community directory with a live API; ranks by listener votes. Mirrors are discovered from its DNS records, with failover. | First choice |
-| [International Public Radio Directory](https://github.com/iprd-org/iprd) | Curated, MIT-licensed catalogue of about 25,000 stations in 225 countries, published as a file on static hosting. Loaded into memory, refreshed daily, copied to disk for restarts. | Used whenever Radio Browser does not answer |
+| [International Public Radio Directory](https://github.com/iprd-org/iprd) | Curated, MIT-licensed list of about 25,000 stations in 225 countries, published as one 18 MB file. | Used whenever Radio Browser does not answer |
 
-Browsing is organised the same way whichever one answers: every country,
-grouped by continent with a filter; a genre picker; search by name; saved
-stations. Without a popularity ranking the second catalogue shows "Around the
-world", the best-documented stations of each country in turn.
+A Worker cannot search an 18 MB file on each request, so the build splits it
+into shards: one per country, one per two-letter prefix of station names and
+of genres, and a "world tour". A search reads the single shard that can hold
+its answer. A name search therefore matches from the start of a word
+("classica" finds "Rádio Clássica"; "assica" does not).
+
+Browsing is the same whichever catalogue answers: every country grouped by
+continent, a genre picker, search by name, and saved stations.
 
 ## How audio plays
 
-Each station is tried in this order:
-
-1. **Direct, readable.** Most broadcasters allow other sites to read their
-   audio (CORS). The stream runs through the Web Audio graph: the ripples
-   carry the real waveform, and the boost control works.
+1. **Direct, readable.** Most broadcasters let other sites read their audio
+   (CORS). The stream runs through the Web Audio graph: the ripples carry the
+   real waveform, and the boost control works.
 2. **Direct, private.** The station plays, but the browser keeps its samples
    from the page. The ripples move in a slow, even swell that is plainly not
    the audio, and boost is disabled with the reason shown.
-3. **Relay (off by default).** Build with `PUBLIC_STREAM_RELAY=fallback` and a
-   station that cannot play directly is fetched through `/api/stream`. That
-   spends this server's bandwidth, about 58 MB per listener-hour at 128 kbps.
-   The relay only fetches public addresses, only passes audio through, and
-   refuses requests from other sites.
 
-On an `https://` page a browser will not load `http://` audio. With the relay
-off, searches leave those stations out rather than list what cannot play.
+On an `https://` page a browser will not load `http://` audio, so searches
+leave those stations out rather than list what cannot play.
 
-## Differences from the terminal app
+## Installed app
 
-- Saved stations and volume are kept in the browser's `localStorage`; favorites
-  in `~/.haaki_radio_favorites.json` are not imported.
-- Audio plays on the system's default output. `--output` and `--device` have
-  no equivalent.
-- Resuming after a pause longer than 15 seconds rejoins the live broadcast.
+The site is a Progressive Web App. Android and desktop Chrome offer **Install**
+(an install button also appears in the app when the browser allows it); on
+iPhone use **Share → Add to Home Screen**. A service worker keeps the app's
+own files, so it opens instantly and still opens offline; station search and
+audio always need a connection. Saved stations and volume are kept in the
+browser.
+
+## Keyboard
+
+| Key | Action |
+| --- | --- |
+| ← → ↑ ↓ | Browse stations |
+| Enter | Tune in |
+| Space | Pause / resume |
+| + − | Volume |
+| / | Search by name |
+| C · G · B · T | Countries · Genres · Saved · Top |
+| F | Save / remove the selected station |
+| [ ] | Previous / next page |
+| S | Stop |
+| ? | Show all shortcuts |
+
+Start-up options: `/?country=IN&search=jazz&volume=60&gain=6`.
 
 ## Layout
 
 ```text
 src/
-  pages/index.astro       The page and its dialogs
-  pages/api/              stations.ts (search), stream.ts (optional relay)
-  components/             Rail, Stage, Browser, PlayerBar, Dialog, Slider, Icon
+  pages/                  index.astro (the app), 404.astro
+  components/             Rail, Stage, Browser, PlayerBar, Dialog, Slider, Icon, Logo
   styles/tokens.css       Design tokens; the WebGL scene reads its colours here
-  lib/                    Pure logic shared by server, client and tests
-  server/                 radio-browser.ts, catalogue.ts, stations.ts, relay.ts
+  lib/                    Pure logic shared by the site, the Worker and the tests
   scripts/                app.ts (interface), player.ts (audio), scene.ts (WebGL)
-tests/                    Offline tests; the relay is tested against local servers
+worker/                   index.ts (Hono app), stations.ts, radio-browser.ts
+scripts/                  build-catalogue.ts (run by the build), build-icons.mjs
+public/                   manifest, service worker, icons, cache headers
+tests/                    Offline tests
 ```
 
 ## Develop
 
 ```sh
-npm run check        # types, including .astro files
+npm run check        # types, including .astro files and the Worker
 npm test
 npm run build
 ```
 
-## Credits
+## Credits and license
 
-Icons: [Phosphor](https://phosphoricons.com/) (MIT). Type: [Archivo](https://github.com/Omnibus-Type/Archivo) (OFL).
-Station data: [Radio Browser](https://www.radio-browser.info/) and the
+Licensed under the [MIT License](LICENSE). Station data:
+[Radio Browser](https://www.radio-browser.info/) and the
 [International Public Radio Directory](https://github.com/iprd-org/iprd) (MIT).
-The iRadio license covers this code, not third-party broadcasts.
+Icons: [Phosphor](https://phosphoricons.com/) (MIT). Type:
+[Archivo](https://github.com/Omnibus-Type/Archivo) (OFL). The license covers
+this repository's code; it grants no rights to third-party broadcasts.

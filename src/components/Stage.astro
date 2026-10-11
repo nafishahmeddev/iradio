@@ -5,7 +5,10 @@ import Logo from './Logo.astro';
 
 <section class="stage" aria-label="Now playing">
   <div class="now">
-    <p class="brand"><Logo size={28} /><span class="display">iradio</span></p>
+    <p class="brand">
+      <Logo size={28} /><span class="display">iradio</span>
+      <button type="button" class="chip" data-action="install" hidden>Install</button>
+    </p>
     <p class="badge label" id="badge" data-state="idle">
       <span class="badge-dot" aria-hidden="true"></span>
       <span id="badge-text">Ready</span>
@@ -54,6 +57,16 @@ import Logo from './Logo.astro';
     gap: var(--space-2);
     margin-bottom: var(--space-2);
     font-size: 1.125rem;
+  }
+
+  .brand .chip {
+    min-height: 2rem;
+    margin-left: var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .brand .chip[hidden] {
+    display: none;
   }
 
   .badge {
@@ -159,8 +172,8 @@ import Logo from './Logo.astro';
     }
 
     .stage {
-      height: 13rem;
-      padding: var(--space-4);
+      height: calc(13rem + env(safe-area-inset-top));
+      padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-4) var(--space-4);
       gap: var(--space-3);
     }
 
