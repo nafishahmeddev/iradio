@@ -1,6 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "iradio",
+  // The "Nafish Ahmed" Cloudflare account. Pinned so a deploy cannot land in another account.
+  "account_id": "d432cc0bfc8bf14ee77375746659e504",
+  // Served at this domain; Cloudflare creates the DNS record and certificate.
+  "routes": [{ "pattern": "iradio.idexa.app", "custom_domain": true }],
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-01",
   // The built site. Cloudflare serves these files itself; only /api/* runs the Worker.

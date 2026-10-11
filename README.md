@@ -132,6 +132,8 @@ npm run build
 
 ## Credits and license
 
+Designed and developed by [Idexa](https://idexa.app).
+
 Licensed under the [MIT License](LICENSE). Station data:
 [Radio Browser](https://www.radio-browser.info/) and the
 [International Public Radio Directory](https://github.com/iprd-org/iprd) (MIT).

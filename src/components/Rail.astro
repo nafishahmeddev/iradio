@@ -24,6 +24,9 @@ const places = [
       ))
     }
   </ul>
+  <a class="maker label muted" href="https://idexa.app" target="_blank" rel="noopener" title="Designed and developed by Idexa">
+    by<br />Idexa
+  </a>
   <button type="button" class="icon-button" data-action="install" aria-label="Install iRadio" hidden>
     <Icon name="install" />
   </button>
@@ -46,6 +49,19 @@ const places = [
 
   .icon-button[hidden] {
     display: none;
+  }
+
+  .maker {
+    margin-bottom: var(--space-2);
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    text-align: center;
+    text-decoration: none;
+    transition: color var(--fast) var(--ease);
+  }
+
+  .maker:hover {
+    color: var(--color-text);
   }
 
   ul {
@@ -113,6 +129,7 @@ const places = [
 
     .brand,
     .keys,
+    .maker,
     [data-action='install'] {
       display: none;
     }

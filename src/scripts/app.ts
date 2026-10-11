@@ -74,6 +74,7 @@ const view = {
   count: element('count'),
   search: element<HTMLInputElement>('search-input'),
   list: element<HTMLUListElement>('stations'),
+  scroller: element('scroller'),
   card: element<HTMLTemplateElement>('station-template'),
   skeleton: element('skeleton'),
   empty: element('empty'),
@@ -393,7 +394,7 @@ function buildGrid(): void {
     return card;
   });
   view.list.replaceChildren(...cards);
-  view.list.scrollTop = 0;
+  view.scroller.scrollTop = 0;
 }
 
 /** Which card is on air and which are saved: updated in place, never by rebuilding. */
@@ -440,7 +441,7 @@ function renderLibrary(): void {
   const waiting = state.loading && count === 0;
   view.mode.textContent = state.kind === 'top' && state.source === 'iprd' ? TOUR : state.mode;
   view.count.textContent = state.loading ? 'Loading…' : count ? plural(count) : '';
-  view.list.hidden = count === 0;
+  view.scroller.hidden = count === 0;
   view.list.style.opacity = state.loading ? '0.4' : '';
   view.skeleton.hidden = !waiting;
   view.empty.hidden = count > 0 || state.loading;
