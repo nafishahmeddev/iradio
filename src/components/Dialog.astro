@@ -26,6 +26,8 @@ const { id, title } = Astro.props;
     padding: var(--space-5);
     color: var(--color-text);
     overflow: hidden;
+    /* Text sits on this, so it is nearly solid; a dialog must read without relying on blur. */
+    background: var(--panel);
   }
 
   .dialog[open] {

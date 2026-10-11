@@ -121,11 +121,12 @@ import Logo from './Logo.astro';
     text-wrap: balance;
   }
 
+  /* Sized outright, not as a share of the stage: Safari resolves a percentage height here to nothing. */
   .dial {
     display: grid;
     place-items: center;
     align-self: center;
-    height: 100%;
+    width: clamp(10rem, 34vh, 22rem);
     aspect-ratio: 1;
     margin-right: 6vw;
   }
@@ -178,8 +179,8 @@ import Logo from './Logo.astro';
     }
 
     .dial {
+      width: 7rem;
       margin-right: 0;
-      height: 80%;
     }
 
     .art {

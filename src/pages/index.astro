@@ -83,6 +83,15 @@ import { GENRES, WORLD } from '../lib/world';
     </form>
   </Dialog>
 
+  <Dialog id="install-dialog" title="Install iRadio">
+    <p class="muted">Add it to your Home Screen and it opens like any other app.</p>
+    <ol class="steps">
+      <li><Icon name="share" /><span>Tap <strong>Share</strong> in your browser's toolbar</span></li>
+      <li><Icon name="add" /><span>Choose <strong>Add to Home Screen</strong></span></li>
+      <li><Icon name="install" /><span>Tap <strong>Add</strong></span></li>
+    </ol>
+  </Dialog>
+
   <Dialog id="help-dialog" title="Keyboard">
     <dl class="help">
       {
@@ -188,7 +197,7 @@ import { GENRES, WORLD } from '../lib/world';
     top: 0;
     margin-bottom: var(--space-1);
     padding: var(--space-2) var(--space-3);
-    background: linear-gradient(rgb(14 14 18), rgb(14 14 18 / 0.85));
+    background: var(--panel);
   }
 
   .region ul {
@@ -223,6 +232,28 @@ import { GENRES, WORLD } from '../lib/world';
   .country:hover,
   .country:focus-visible {
     background: var(--surface-strong);
+  }
+
+  .steps {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .steps li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .steps strong {
+    font-weight: 600;
   }
 
   .help {

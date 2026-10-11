@@ -657,7 +657,7 @@ view.genres.addEventListener('click', (event) => {
 });
 
 // Clicking the dimmed backdrop closes a dialog, as people expect.
-for (const dialog of [view.genreDialog, view.countryDialog, view.helpDialog]) {
+for (const dialog of document.querySelectorAll('dialog')) {
   dialog.addEventListener('click', (event) => event.target === dialog && dialog.close());
 }
 
@@ -724,15 +724,30 @@ let installPrompt: InstallPrompt | null = null;
 function offerInstall(prompt: InstallPrompt | null): void {
   installPrompt = prompt;
   for (const button of document.querySelectorAll<HTMLElement>('[data-action="install"]')) {
-    button.hidden = prompt === null;
+    button.hidden = prompt === null && !guided;
   }
 }
 
+/**
+ * iPhone and iPad never offer an install prompt; there the app is added from
+ * the browser's Share menu, so the button explains how instead.
+ */
+const onApple =
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const installed =
+  window.matchMedia('(display-mode: standalone)').matches ||
+  (navigator as Navigator & { standalone?: boolean }).standalone === true;
+const guided = onApple && !installed;
+
 async function install(): Promise<void> {
   const prompt = installPrompt;
-  if (!prompt) return;
-  offerInstall(null);
-  await prompt.prompt();
+  if (prompt) {
+    offerInstall(null);
+    await prompt.prompt();
+  } else if (guided) {
+    element<HTMLDialogElement>('install-dialog').showModal();
+  }
 }
 
 window.addEventListener('beforeinstallprompt', (event) => {
@@ -740,6 +755,7 @@ window.addEventListener('beforeinstallprompt', (event) => {
   offerInstall(event as InstallPrompt);
 });
 window.addEventListener('appinstalled', () => offerInstall(null));
+offerInstall(null);
 
 // The service worker keeps the app's own files; skipped in development, where files change constantly.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
@@ -755,7 +771,7 @@ const tokens = getComputedStyle(document.documentElement);
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const drawing = createScene(element<HTMLCanvasElement>('scene'), {
-  anchor: element('dial'),
+  anchor: element('art'),
   read: () => player.read(),
   colors: {
     ink: tokens.getPropertyValue('--color-ink'),

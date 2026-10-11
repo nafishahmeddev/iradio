@@ -13,8 +13,8 @@ const POINTS = 96;
 const RINGS = 22;
 /** Seconds between one ring leaving the dial and the next. */
 const CADENCE = 0.075;
-/** The innermost ring's radius as a share of half the dial element. */
-const RING = 0.5;
+/** The innermost ring's radius, measured in radii of the artwork disc it surrounds. */
+const RING = 1.14;
 
 const VERTEX = `#version 300 es
 in vec2 aPosition;
@@ -144,7 +144,7 @@ export interface SceneInput {
 }
 
 export interface SceneOptions {
-  /** The element the dial is drawn around. */
+  /** The artwork disc the ripples leave from. */
   anchor: HTMLElement;
   /**
    * What is playing right now; 'unreadable' when something plays but its
@@ -303,7 +303,8 @@ function createRenderer(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, o
       (box.left + box.width / 2 - view.left) * scale,
       height - (box.top + box.height / 2 - view.top) * scale,
     );
-    gl.uniform1f(at('uRadius'), (Math.min(box.width, box.height) / 2) * RING * scale);
+    // Never zero: a zero radius would divide every pixel's position by nothing.
+    gl.uniform1f(at('uRadius'), Math.max(8, (Math.min(box.width, box.height) / 2) * RING * scale));
     gl.uniform1f(at('uPhase'), signal.phase);
     gl.uniform1f(at('uTime'), still ? 0 : time);
     gl.uniform1f(at('uLevel'), signal.level);
