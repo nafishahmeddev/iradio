@@ -13,6 +13,7 @@ import {
   GLIDE_MS,
   LOCK_SECONDS,
   REJUMP_WINDOW_MS,
+  CALM_MS,
   MAX_SONG_SECONDS,
   MAX_WAITING,
   MAX_WAITING_EACH,
@@ -366,16 +367,18 @@ export function initRooms(host: RoomsHost): Rooms {
     if (rateUntil && clock >= rateUntil) {
       rateUntil = 0;
       player.rate(1);
+      // A change of speed on a video can be heard; give it a long rest before judging again.
+      if (player.rates === 'steps') settleUntil = clock + CALM_MS;
     }
     // A live station has no position to keep to. Otherwise judge the position once a
     // second, but not while a jump is landing or a speed change is still closing the gap.
-    if (item.seconds === 0 || checking || clock < settleUntil || rateUntil || clock - checkedAt < 1000 || !player.playing()) return;
+    if (item.seconds === 0 || checking || clock < settleUntil || rateUntil || clock - checkedAt < 1000 || !player.settled()) return;
     checkedAt = clock;
     checking = true;
     const current = player;
     void current.position().then((actual) => {
       checking = false;
-      if (current !== player || phase !== 'playing' || !room || room.pausedAt !== null || !current.playing()) return;
+      if (current !== player || phase !== 'playing' || !room || room.pausedAt !== null || !current.settled() || !Number.isFinite(actual)) return;
       const target = (now() - room.startAt) / 1000;
       const error = actual - target;
       if (Math.abs(error) < LOCK_SECONDS) gate = 1;

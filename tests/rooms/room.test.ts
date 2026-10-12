@@ -425,8 +425,8 @@ describe('staying in step', () => {
   });
 
   it('closes a small gap by changing speed for exactly as long as it takes', () => {
-    // 0.2 s ahead at three-quarter speed loses 0.25 s per second: 0.8 s.
-    expect(correct(0.2, 50, 'steps', 0)).toEqual({ kind: 'rate', rate: 0.75, forMs: 800 });
+    // 0.4 s ahead at three-quarter speed loses 0.25 s per second: 1.6 s.
+    expect(correct(0.4, 50, 'steps', 0)).toEqual({ kind: 'rate', rate: 0.75, forMs: 1600 });
     expect(correct(-0.5, 50, 'steps', 0)).toEqual({ kind: 'rate', rate: 1.25, forMs: 2000 });
   });
 
@@ -442,8 +442,8 @@ describe('staying in step', () => {
 
   it('leaves a coarse player alone until it has drifted far enough to matter', () => {
     expect(correct(0.1, 50, 'steps', 0)).toEqual({ kind: 'none' });
-    expect(correct(-0.14, 50, 'steps', 0)).toEqual({ kind: 'none' });
-    expect(correct(-0.16, 50, 'steps', 0)).toEqual({ kind: 'rate', rate: 1.25, forMs: 640 });
+    expect(correct(-0.28, 50, 'steps', 0)).toEqual({ kind: 'none' });
+    expect(correct(-0.32, 50, 'steps', 0)).toEqual({ kind: 'rate', rate: 1.25, forMs: 1280 });
   });
 
   it('closes the gap by speed just after a jump, and jumps again only when far off', () => {

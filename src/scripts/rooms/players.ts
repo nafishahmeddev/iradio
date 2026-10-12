@@ -5,7 +5,8 @@
  * has been started once keeps that permission for the songs that follow.
  */
 
-import { between, type Rates } from '../../lib/rooms/follow';
+import { between, STALE_MS, type Rates } from '../../lib/rooms/follow';
+import { STEADY_MS } from '../../lib/rooms/limits';
 import { fileTitle } from '../../lib/rooms/links';
 import type { Source } from '../../lib/rooms/room';
 
@@ -22,6 +23,8 @@ export interface RoomPlayer {
   /** 0 to 1. */
   volume: (level: number) => void;
   playing: () => boolean;
+  /** Playing without a break for long enough that its position can be judged. */
+  settled: () => boolean;
   /** Shown in the room's frame, or null for audio with no picture. */
   readonly picture: HTMLElement | null;
 }
@@ -118,6 +121,8 @@ function youtube(hooks: Hooks): RoomPlayer {
   let api: YouTubeApi | undefined;
   let cued: (() => void) | undefined;
   let speed = 1;
+  /** When the player last started, stopped or began buffering. */
+  let changedAt = 0;
   // YouTube reports its position only a few times a second. Noting the moment each
   // report arrives lets the true position between reports be worked out.
   let reported = 0;
@@ -147,6 +152,7 @@ function youtube(hooks: Hooks): RoomPlayer {
             resolve();
           },
           onStateChange: (event: { data: number }) => {
+            changedAt = performance.now();
             if (event.data === window.YT!.PlayerState['CUED']) cued?.();
           },
           onError: (event: { data: number }) => hooks.failed(`youtube-${event.data}`),
@@ -170,7 +176,8 @@ function youtube(hooks: Hooks): RoomPlayer {
     play: () => api?.playVideo(),
     pause: () => api?.pauseVideo(),
     seek: (seconds) => api?.seekTo(seconds, true),
-    position: async () => between(reported, reportedAt, performance.now(), speed, isPlaying()),
+    // A report too old to trust gives no position at all, so nothing is decided on it.
+    position: async () => (performance.now() - reportedAt > STALE_MS ? Number.NaN : between(reported, reportedAt, performance.now(), speed, isPlaying())),
     rates: 'steps',
     rate: (next) => {
       if (next === speed) return;
@@ -183,6 +190,8 @@ function youtube(hooks: Hooks): RoomPlayer {
       const state = api?.getPlayerState();
       return state === window.YT?.PlayerState['PLAYING'] || state === window.YT?.PlayerState['BUFFERING'];
     },
+    // Buffering does not count here: a video still loading is not where it will be once it plays.
+    settled: () => isPlaying() && performance.now() - changedAt > STEADY_MS,
   };
 }
 
@@ -233,6 +242,7 @@ function soundcloud(hooks: Hooks): RoomPlayer {
     rate: () => undefined,
     volume: (level) => api?.setVolume(Math.round(level * 100)),
     playing: () => !paused,
+    settled: () => !paused,
   };
 }
 
@@ -271,6 +281,7 @@ function audio(hooks: Hooks): RoomPlayer {
       element.volume = level;
     },
     playing: () => !element.paused && !element.ended,
+    settled: () => !element.paused && !element.ended && !element.seeking && element.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA,
   };
 }
 

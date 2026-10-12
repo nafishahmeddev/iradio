@@ -23,7 +23,7 @@ export const JUMP_BEYOND_FIXED = 0.25;
  * A player with only coarse speeds also reports its position coarsely. It is left
  * alone until it has drifted this far: chasing less is heard as stutter.
  */
-export const DRIFT_ALLOWED = 0.15;
+export const DRIFT_ALLOWED = 0.3;
 /** Just after a jump the gap is closed by speed up to here, so a slow connection does not jump again and again. */
 export const REJUMP_BEYOND = 2.5;
 const STEP = 0.25;
@@ -63,6 +63,9 @@ export function learnLead(lead: number, residual: number): number {
   return Math.max(0, Math.min(2, lead - residual * 0.7));
 }
 
+/** A position report older than this cannot be trusted to say where the player is now. */
+export const STALE_MS = 600;
+
 /**
  * A player that reports its position only now and then: the true position is
  * the last report plus the time since, while it is playing.
@@ -70,7 +73,7 @@ export function learnLead(lead: number, residual: number): number {
 export function between(reported: number, reportedAtMs: number, nowMs: number, rate: number, playing: boolean): number {
   if (!playing) return reported;
   // A report older than this means the player has stalled; do not run on ahead of it.
-  return reported + (Math.min(nowMs - reportedAtMs, 600) / 1000) * rate;
+  return reported + (Math.min(nowMs - reportedAtMs, STALE_MS) / 1000) * rate;
 }
 
 /**
