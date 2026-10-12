@@ -6,12 +6,22 @@
 import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 
+import { makeCode, tidyCode } from '../src/lib/rooms/code';
 import { isCountryCode, type StationQuery } from '../src/lib/stations';
 import { findStations, providers, SOURCES, type Assets, type Source } from './stations';
 
+/** A room's Durable Object, reached by its code. Typed structurally so this file needs no Cloudflare types. */
+interface Rooms {
+  idFromName: (name: string) => unknown;
+  get: (id: never) => { fetch: (request: Request) => Promise<Response> };
+}
+
 interface Bindings {
   ASSETS: Assets;
+  ROOMS: Rooms;
 }
+
+const CODE_ATTEMPTS = 5;
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -64,6 +74,36 @@ app.get(
     }
   },
 );
+
+// The clock every device in a room sets itself by.
+app.get('/api/time', (c) => c.json({ now: Date.now() }, 200, { 'Cache-Control': 'no-store' }));
+
+const room = (rooms: Rooms, code: string) => rooms.get(rooms.idFromName(code) as never);
+
+// A new room: draw a code and claim it; on the rare clash, draw again.
+app.post('/api/rooms', async (c) => {
+  const params = new URL(c.req.url).searchParams;
+  for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
+    const code = makeCode();
+    const target = new URL(`/api/rooms/${code}/create?${params}`, c.req.url);
+    const response = await room(c.env.ROOMS, code).fetch(new Request(target, { method: 'POST' }));
+    if (response.status !== 409) return response;
+  }
+  return c.json({ error: 'busy' }, 503);
+});
+
+// Everything else about a room goes to its own object: the live connection and voice notes.
+app.all('/api/rooms/:code/*', (c) => {
+  const code = tidyCode(c.req.param('code'));
+  if (!code) return c.json({ error: 'none' }, 404);
+  // The live connection must come from this app's own pages, not another site.
+  const origin = c.req.header('Origin');
+  if (origin && new URL(origin).host !== new URL(c.req.url).host) return c.json({ error: 'forbidden' }, 403);
+  return room(c.env.ROOMS, code).fetch(c.req.raw);
+});
+
+// A room's link opens the app itself; the app reads the code from the address.
+app.get('/r/*', (c) => c.env.ASSETS.fetch(new URL('/', c.req.url)));
 
 app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404));
 

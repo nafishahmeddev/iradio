@@ -4,6 +4,7 @@ import Dialog from '../components/Dialog.astro';
 import Icon from '../components/Icon.astro';
 import PlayerBar from '../components/PlayerBar.astro';
 import Rail from '../components/Rail.astro';
+import Rooms from '../components/rooms/Rooms.astro';
 import Stage from '../components/Stage.astro';
 import Base from '../layouts/Base.astro';
 import { KEYS } from '../lib/keys';
@@ -21,6 +22,12 @@ import { GENRES, WORLD } from '../lib/world';
     <Stage />
     <Browser />
     <PlayerBar />
+    <button type="button" class="room-return glass" data-action="rooms">
+      <span class="label">You are in a room</span>
+      <span class="muted">Pick a station to add it to the queue</span>
+      <span class="chip" aria-hidden="true">Back to room</span>
+    </button>
+    <Rooms />
   </div>
 
   <p class="toast glass" id="toast" role="status"></p>
@@ -133,6 +140,41 @@ import { GENRES, WORLD } from '../lib/world';
     height: 100dvh;
   }
 
+  /* In Rooms, the room takes the place of the stage, the stations and the player bar. */
+  .app[data-view='rooms'] {
+    grid-template: 'rail rooms' minmax(0, 1fr) / auto minmax(0, 1fr);
+  }
+
+  .app[data-view='rooms'] :global(:is(.stage, .browser, .bar)),
+  .app[data-in-room] :global(.bar) {
+    display: none;
+  }
+
+  /* While in a room but browsing stations, this bar stands where the player bar was. */
+  .room-return {
+    grid-area: bar;
+    display: none;
+    align-items: center;
+    gap: var(--space-4);
+    margin: 0 var(--space-3) max(var(--space-3), env(safe-area-inset-bottom));
+    padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+    border-radius: 1.5rem;
+    color: var(--color-text);
+    text-align: left;
+  }
+
+  .room-return .muted {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .app[data-in-room]:not([data-view='rooms']) .room-return {
+    display: flex;
+  }
+
   @media (max-width: 47.99rem) {
     .app {
       grid-template:
@@ -140,6 +182,20 @@ import { GENRES, WORLD } from '../lib/world';
         'rail' auto
         'browser' minmax(0, 1fr)
         'bar' auto / minmax(0, 1fr);
+    }
+
+    .app[data-view='rooms'] {
+      grid-template:
+        'rooms' minmax(0, 1fr)
+        'rail' auto / minmax(0, 1fr);
+    }
+
+    .room-return .muted {
+      display: none;
+    }
+
+    .room-return .chip {
+      margin-left: auto;
     }
   }
 

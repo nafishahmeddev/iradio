@@ -38,6 +38,7 @@ uniform float uLevel;
 uniform float uBass;
 uniform float uLive;
 uniform float uMotion;
+uniform float uRipples;
 out vec4 outColor;
 
 const float PI = 3.14159265;
@@ -101,7 +102,7 @@ void main() {
   color += uCool * 0.3 * swell * light(q, vec2(0.3 + 0.09 * cos(uTime * 0.08), -0.24 + 0.1 * sin(uTime * 0.12)), 0.48);
   color += uAmber * (0.08 + 0.34 * uBass) * light(q, vec2(0.0), 0.26);
   // The dial face stays dark so the artwork reads clearly.
-  color = mix(color, uInk, smoothstep(1.02, 0.9, r) * 0.9);
+  color = mix(color, uInk, smoothstep(1.02, 0.9, r) * 0.9 * uRipples);
 
   // Ripples. Ring k left the dial k steps ago and carries the waveform from then.
   float gap = SPREAD / RINGS;
@@ -123,7 +124,7 @@ void main() {
     float line = smoothstep(width, 0.0, away) + 0.16 * exp(-away * away / (width * width * 90.0));
     ripples += hue(age) * line * fade;
   }
-  color += ripples * mix(0.45, 1.0, uLive);
+  color += ripples * mix(0.45, 1.0, uLive) * uRipples;
 
   // Finish: vignette, then fine film grain. Two samples summed give the soft,
   // bell-shaped grain of real film; it sits in the light, not the blacks.
@@ -144,8 +145,8 @@ export interface SceneInput {
 }
 
 export interface SceneOptions {
-  /** The artwork disc the ripples leave from. */
-  anchor: HTMLElement;
+  /** The element the ripples leave from right now, or null where there are none: only the light remains. */
+  anchor: () => HTMLElement | null;
   /**
    * What is playing right now; 'unreadable' when something plays but its
    * samples are private; null when nothing plays.
@@ -287,13 +288,21 @@ function createRenderer(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, o
     gl.uniform3fv(at(name), rgb(hex));
   }
 
+  let ripples = 1;
+
   return (signal, time) => {
     const { width, height } = canvas;
     const still = options.reducedMotion();
     // Where the dial element sits, in drawing-buffer pixels with y pointing up.
     const scale = width / canvas.clientWidth;
-    const box = options.anchor.getBoundingClientRect();
     const view = canvas.getBoundingClientRect();
+    const anchored = options.anchor()?.getBoundingClientRect();
+    // With nothing to surround, the ripples rest to the upper right, where the stage's dial sits.
+    const rest = Math.min(view.width, view.height) * 0.22;
+    const box =
+      anchored && anchored.width > 0
+        ? anchored
+        : new DOMRect(view.left + view.width * 0.72 - rest / 2, view.top + view.height * 0.3 - rest / 2, rest, rest);
 
     gl.viewport(0, 0, width, height);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, POINTS, RINGS, 0, gl.RED, gl.UNSIGNED_BYTE, signal.history);
@@ -311,6 +320,9 @@ function createRenderer(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, o
     gl.uniform1f(at('uBass'), signal.bass);
     gl.uniform1f(at('uLive'), signal.live);
     gl.uniform1f(at('uMotion'), still ? 0 : 1);
+    // Ripples fade out, not snap, when the view has nothing for them to surround.
+    ripples += ((anchored && anchored.width > 0 ? 1 : 0) - ripples) * 0.08;
+    gl.uniform1f(at('uRipples'), ripples);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   };
 }

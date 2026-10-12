@@ -118,6 +118,7 @@ describe('catalogue shards as static files', () => {
 describe('the API', () => {
   const env = {
     ASSETS: { fetch: async () => Response.json([station]) } satisfies Assets,
+    ROOMS: { idFromName: (name: string) => name, get: () => ({ fetch: async () => new Response('room') }) },
   };
 
   it('rejects searches it cannot run', async () => {
@@ -130,6 +131,13 @@ describe('the API', () => {
     const response = await app.request('/api/stations?countrycode=FR&source=iprd', {}, env);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ stations: [station], source: 'iprd' });
+  });
+
+  it('sends a room\'s requests to its object, and refuses other sites', async () => {
+    expect(await (await app.request('/api/rooms/k7m2qx/live', {}, env)).text()).toBe('room');
+    expect((await app.request('/api/rooms/nope/live', {}, env)).status).toBe(404);
+    const foreign = await app.request('http://localhost/api/rooms/K7M2QX/live', { headers: { Origin: 'https://evil.example' } }, env);
+    expect(foreign.status).toBe(403);
   });
 
   it('has nothing else under /api', async () => {

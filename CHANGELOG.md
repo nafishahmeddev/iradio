@@ -10,3 +10,5 @@
   Directory, with every country and a genre picker.
 - Audio plays directly from broadcasters.
 - Installable as a Progressive Web App, with an offline-capable shell.
+- Rooms: a shared queue of YouTube, SoundCloud, audio-file and station items,
+  synced playback on any device that opts in, and recorded voice notes.

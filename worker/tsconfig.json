@@ -1,0 +1,10 @@
+{
+  // The Worker runs on Cloudflare, not in a browser, so it is checked against Cloudflare's types.
+  "extends": "astro/tsconfigs/strictest",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["@cloudflare/workers-types"],
+    "noEmit": true
+  },
+  "include": ["room.ts", "main.ts", "index.ts", "stations.ts", "radio-browser.ts"]
+}

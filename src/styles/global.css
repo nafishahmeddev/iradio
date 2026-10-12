@@ -153,6 +153,48 @@ svg {
   color: var(--color-amber);
 }
 
+/* The main action on a screen: one per view. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control);
+  padding: 0 var(--space-5);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-text);
+  color: var(--color-on-light);
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    scale var(--fast) var(--ease),
+    opacity var(--fast) var(--ease),
+    background var(--fast) var(--ease);
+}
+
+.button:hover:not(:disabled) {
+  scale: 1.03;
+}
+
+.button:active:not(:disabled) {
+  scale: 0.97;
+}
+
+.button:disabled {
+  opacity: 0.35;
+}
+
+/* The same button once its action is on, such as listening: quieter, so the room is the focus. */
+.button[aria-pressed='true'] {
+  background: var(--surface-strong);
+  color: var(--color-text);
+}
+
+.button.danger {
+  background: var(--color-ember);
+}
+
 /* Pill button with a label. */
 .chip {
   display: inline-flex;
@@ -181,6 +223,12 @@ svg {
 
 .chip:disabled {
   opacity: 0.35;
+}
+
+.chip[aria-pressed='true'] {
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: var(--color-on-light);
 }
 
 /* Text field with a leading icon. */
@@ -260,6 +308,24 @@ svg {
 
 .logo img[data-loaded] {
   opacity: 1;
+}
+
+/*
+ * A person: a plain head-and-shoulders figure in their colour. It carries no
+ * hair, face or clothing, so it says nothing about gender or age.
+ */
+.avatar {
+  border-radius: var(--radius-full);
+}
+
+.avatar > span {
+  display: none;
+}
+
+.avatar svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
 }
 
 @media (pointer: coarse) {

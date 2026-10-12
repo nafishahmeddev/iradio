@@ -1,0 +1,693 @@
+---
+import Dialog from '../Dialog.astro';
+import Icon from '../Icon.astro';
+import Slider from '../Slider.astro';
+import { DEFAULT_VOLUME, VOLUME_STEP } from '../../lib/config';
+import { NAME_MAX, ROOM_NAME_MAX } from '../../lib/rooms/limits';
+---
+
+<section class="rooms" id="rooms" aria-label="Rooms" hidden>
+  <!-- Not in a room yet. -->
+  <div class="lobby" id="lobby">
+    <p class="label muted">Rooms</p>
+    <h1 class="display">Listen together</h1>
+    <p class="muted lede">Create a room and share the code. Everyone adds songs to one queue.</p>
+    <button type="button" class="button" data-room="create"><Icon name="plus" size={20} />Create a room</button>
+    <form class="join" id="join-form">
+      <label class="field">
+        <span class="visually-hidden">Room code</span>
+        <input id="join-code" placeholder="Room code" maxlength="60" autocapitalize="characters" autocomplete="off" spellcheck="false" />
+        <button type="submit" class="chip" id="join-button" disabled>Join</button>
+      </label>
+    </form>
+    <p class="problem label" id="lobby-problem" role="alert"></p>
+  </div>
+
+  <!-- In a room. -->
+  <div class="room" id="room" hidden>
+    <header class="room-head">
+      <h1 class="display clip" id="room-name"></h1>
+      <button type="button" class="chip code" data-room="share" aria-label="Share this room">
+        <span class="label" id="room-code"></span><Icon name="share" size={16} />
+      </button>
+      <span class="spacer"></span>
+      <button type="button" class="chip" data-room="people"><Icon name="rooms" size={18} /><span id="people-count">1</span></button>
+      <button type="button" class="icon-button" data-room="settings" id="settings-button" aria-label="Room settings" hidden>
+        <Icon name="settings" />
+      </button>
+      <button type="button" class="icon-button" data-room="leave" aria-label="Leave room"><Icon name="leave" /></button>
+    </header>
+
+    <p class="banner label" id="room-banner" role="status" hidden></p>
+
+    <div class="room-body">
+      <div class="deck">
+        <div class="frame" id="frame">
+          <div class="frame-art logo" id="frame-art">
+            <span id="frame-mono" aria-hidden="true"></span>
+            <img id="frame-image" alt="" referrerpolicy="no-referrer" />
+          </div>
+        </div>
+
+        <div class="now">
+          <p class="badge label" id="room-badge" data-state="empty">
+            <span class="badge-dot" aria-hidden="true"></span><span id="room-state">Ready</span><span id="room-time"></span>
+          </p>
+          <h2 class="display room-title" id="room-title">Drop the first song</h2>
+          <p class="label muted clip" id="room-by">Paste a link or add a station.</p>
+          <div class="progress" aria-hidden="true"><span id="room-progress"></span></div>
+        </div>
+
+        <p class="speaking glass" id="speaking" role="status" hidden>
+          <span class="logo avatar" id="speaking-art"><span id="speaking-mono"></span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9.2" r="4.2"></circle><path d="M3.5 24a8.5 8.5 0 0 1 17 0z"></path></svg></span>
+          <span id="speaking-text"></span>
+          <button type="button" class="chip" id="speaking-play" hidden>Play</button>
+        </p>
+
+        <div class="deck-controls">
+          <button type="button" class="button" id="listen" data-room="listen">Listen here</button>
+          <button type="button" class="icon-button swap" id="room-pause" data-room="pause" data-state="playing" hidden>
+            <Icon name="play" class="show-play" /><Icon name="pause" class="show-pause" />
+          </button>
+          <button type="button" class="chip" id="skip" data-room="skip">Skip</button>
+          <button type="button" class="chip" id="mic" data-room="mic"><Icon name="mic" size={18} /><span id="mic-label">Voice note</span></button>
+          <div class="deck-volume"><Slider id="room-volume" label="Volume" min={0} max={100} step={VOLUME_STEP} value={DEFAULT_VOLUME} /></div>
+        </div>
+      </div>
+
+      <div class="queue glass">
+        <form id="add-form">
+          <label class="field">
+            <Icon name="link" size={18} />
+            <span class="visually-hidden">Add a song by link</span>
+            <input id="add-link" placeholder="Paste a YouTube, SoundCloud or audio link" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" />
+          </label>
+        </form>
+        <div class="add-preview" id="add-preview" hidden>
+          <span class="logo" id="add-art"><span id="add-mono" aria-hidden="true"></span><img id="add-image" alt="" referrerpolicy="no-referrer" /></span>
+          <span class="item-text"><span class="clip item-title" id="add-title"></span><span class="label muted" id="add-meta"></span></span>
+          <button type="button" class="button" id="add-button">Add</button>
+        </div>
+        <p class="problem label" id="add-problem" role="alert"></p>
+
+        <ul class="approvals" id="approvals"></ul>
+
+        <div class="lists" id="lists">
+          <h3 class="label muted" id="queue-title">Up next</h3>
+          <ul class="items" id="items"></ul>
+          <p class="muted queue-empty" id="queue-empty">Nothing waiting. Add a song, or pick a station from Top, Countries or Genres.</p>
+          <h3 class="label muted" id="history-title" hidden>Played</h3>
+          <ul class="items" id="history"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<template id="item-template">
+  <li class="item">
+    <span class="logo"><span class="item-mono" aria-hidden="true"></span><img alt="" loading="lazy" referrerpolicy="no-referrer" /></span>
+    <span class="item-text"><span class="clip item-title"></span><span class="label muted clip item-by"></span></span>
+    <button type="button" class="icon-button" data-item="next" aria-label="Play next" hidden><Icon name="up" size={18} /></button>
+    <button type="button" class="icon-button" data-item="remove" aria-label="Remove" hidden><Icon name="trash" size={18} /></button>
+    <button type="button" class="icon-button" data-item="again" aria-label="Add again" hidden><Icon name="plus" size={18} /></button>
+  </li>
+</template>
+
+<template id="person-template">
+  <li class="person">
+    <span class="logo avatar"><span class="person-mono" aria-hidden="true"></span><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9.2" r="4.2"></circle><path d="M3.5 24a8.5 8.5 0 0 1 17 0z"></path></svg></span>
+    <span class="item-text"><span class="clip person-name"></span><span class="label muted person-note"></span></span>
+    <button type="button" class="chip" data-person="mic" hidden></button>
+    <button type="button" class="icon-button" data-person="host" aria-label="Make host" hidden><Icon name="crown" size={18} /></button>
+    <button type="button" class="icon-button" data-person="remove" aria-label="Remove from room" hidden><Icon name="trash" size={18} /></button>
+  </li>
+</template>
+
+<template id="approval-template">
+  <li class="approval">
+    <span class="item-text"><span class="clip approval-text"></span><span class="label muted approval-note"></span></span>
+    <button type="button" class="chip" data-note="hear">Hear it</button>
+    <button type="button" class="chip" data-note="approve" aria-pressed="true">Play for everyone</button>
+    <button type="button" class="icon-button" data-note="discard" aria-label="Discard"><Icon name="trash" size={18} /></button>
+  </li>
+</template>
+
+<Dialog id="name-dialog" title="Your name">
+  <form method="dialog" id="name-form" class="stack">
+    <p class="muted">This is how others in the room will see you.</p>
+    <label class="field">
+      <span class="visually-hidden">Your name</span>
+      <input id="name-input" maxlength={NAME_MAX} placeholder="Your name" autocomplete="nickname" enterkeyhint="done" />
+    </label>
+    <button type="submit" class="button" id="name-continue" disabled>Continue</button>
+  </form>
+</Dialog>
+
+<Dialog id="share-dialog" title="Invite people">
+  <div class="stack share">
+    <p class="share-code display" id="share-code"></p>
+    <div class="qr" id="share-qr" role="img" aria-label="QR code for this room"></div>
+    <div class="row">
+      <button type="button" class="button" id="share-copy"><Icon name="copy" size={18} /><span id="share-copy-label">Copy link</span></button>
+      <button type="button" class="chip" id="share-native" hidden><Icon name="share" size={16} />Share</button>
+    </div>
+  </div>
+</Dialog>
+
+<Dialog id="people-dialog" title="In this room">
+  <ul class="people" id="people"></ul>
+</Dialog>
+
+<Dialog id="room-settings-dialog" title="Room settings">
+  <div class="stack">
+    <label class="field">
+      <span class="visually-hidden">Room name</span>
+      <input id="setting-name" maxlength={ROOM_NAME_MAX} placeholder="Room name" />
+    </label>
+    <div class="setting">
+      <p>Who can add songs</p>
+      <div class="row" data-setting="adders">
+        <button type="button" class="chip" data-value="everyone">Everyone</button>
+        <button type="button" class="chip" data-value="host">Host only</button>
+      </div>
+    </div>
+    <div class="setting">
+      <p>Who can send voice notes</p>
+      <div class="row" data-setting="notes">
+        <button type="button" class="chip" data-value="host">Host only</button>
+        <button type="button" class="chip" data-value="selected">Selected people</button>
+        <button type="button" class="chip" data-value="everyone">Everyone</button>
+      </div>
+    </div>
+    <div class="setting">
+      <p>Approve voice notes first</p>
+      <div class="row" data-setting="approveNotes">
+        <button type="button" class="chip" data-value="true">On</button>
+        <button type="button" class="chip" data-value="false">Off</button>
+      </div>
+    </div>
+    <div class="setting">
+      <p>Lock room <span class="muted">(no new people)</span></p>
+      <div class="row" data-setting="locked">
+        <button type="button" class="chip" data-value="true">On</button>
+        <button type="button" class="chip" data-value="false">Off</button>
+      </div>
+    </div>
+    <button type="button" class="button danger" data-room="end">End room</button>
+  </div>
+</Dialog>
+
+<Dialog id="end-dialog" title="End this room for everyone?">
+  <div class="row">
+    <button type="button" class="button danger" id="end-confirm">End room</button>
+    <button type="button" class="chip" id="end-cancel">Keep it open</button>
+  </div>
+</Dialog>
+
+<Dialog id="note-dialog" title="Voice note">
+  <div class="stack note">
+    <p class="muted" id="note-hint">Hold the button and speak. Up to 20 seconds.</p>
+    <button type="button" class="record" id="note-record" aria-label="Hold to record"><Icon name="mic" size={32} /></button>
+    <p class="note-time display" id="note-time">0:00</p>
+    <div class="row" id="note-when" hidden>
+      <button type="button" class="chip" data-when="now" aria-pressed="true">Play now</button>
+      <button type="button" class="chip" data-when="after" aria-pressed="false">After this song</button>
+    </div>
+    <div class="row" id="note-actions" hidden>
+      <button type="button" class="chip" id="note-preview">Preview</button>
+      <button type="button" class="chip" id="note-again">Record again</button>
+      <button type="button" class="button" id="note-send">Send</button>
+    </div>
+    <p class="problem label" id="note-problem" role="alert"></p>
+  </div>
+</Dialog>
+
+<style>
+  /* Rooms takes the place of the stage and the station grid. */
+  .rooms {
+    grid-area: rooms;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    padding: var(--space-5) var(--space-6);
+  }
+
+  .rooms[hidden],
+  .room[hidden],
+  .lobby[hidden] {
+    display: none;
+  }
+
+  .lobby {
+    display: grid;
+    align-content: center;
+    justify-items: start;
+    gap: var(--space-4);
+    flex: 1;
+    max-width: 34rem;
+  }
+
+  .lobby h1 {
+    font-size: var(--text-display);
+  }
+
+  .lede {
+    font-size: var(--text-lg);
+    line-height: 1.3;
+  }
+
+  .join {
+    width: min(100%, 22rem);
+  }
+
+  .join .field {
+    padding-right: var(--space-1);
+  }
+
+  .join input {
+    font-stretch: var(--width-label);
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .join input::placeholder {
+    letter-spacing: 0.02em;
+    text-transform: none;
+    font-weight: 400;
+  }
+
+  .problem {
+    color: var(--color-amber);
+  }
+
+  .problem:empty,
+  .approvals:empty {
+    display: none;
+  }
+
+  .room {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    flex: 1;
+    min-height: 0;
+  }
+
+  .room-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .room-head h1 {
+    font-size: var(--text-lg);
+    padding-block: 0.1em;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  .code .label {
+    letter-spacing: 0.24em;
+    color: var(--color-text);
+  }
+
+  .banner {
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--surface-strong);
+    color: var(--color-amber);
+  }
+
+  .banner[hidden] {
+    display: none;
+  }
+
+  .room-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(20rem, 1fr);
+    gap: var(--space-6);
+    flex: 1;
+    min-height: 0;
+  }
+
+  .deck {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* YouTube and SoundCloud require their player to be shown, so the frame is the picture. */
+  .frame {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: 1;
+    min-height: 12rem;
+    max-height: 26rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: rgb(0 0 0 / 0.45);
+    overflow: hidden;
+  }
+
+  .frame :global(iframe),
+  .frame > :global(div:not(.frame-art)) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+
+  .frame-art {
+    --logo: min(46%, 12rem);
+    border-radius: var(--radius-full);
+    font-size: 3rem;
+  }
+
+  .frame[data-picture] .frame-art {
+    display: none;
+  }
+
+  .now {
+    display: grid;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--color-muted);
+  }
+
+  .badge-dot {
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: var(--radius-full);
+    background: currentColor;
+  }
+
+  .badge[data-state='playing'] {
+    color: var(--color-amber);
+  }
+
+  .badge #room-time {
+    color: var(--color-muted);
+  }
+
+  .room-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+    padding-bottom: 0.06em;
+    font-size: clamp(1.5rem, 1rem + 1.6vw, 2.5rem);
+  }
+
+  .progress {
+    height: 2px;
+    border-radius: 2px;
+    background: var(--line);
+    overflow: hidden;
+  }
+
+  .progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--color-amber);
+  }
+
+  .speaking {
+    --logo: 2rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+    border-radius: var(--radius-full);
+    align-self: start;
+    animation: arrive var(--slow) var(--ease);
+  }
+
+  .speaking[hidden],
+  .speaking [hidden] {
+    display: none;
+  }
+
+  .speaking .logo {
+    border-radius: var(--radius-full);
+    font-size: var(--text-sm);
+  }
+
+  @keyframes arrive {
+    from {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+
+  .deck-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .deck-controls [hidden] {
+    display: none;
+  }
+
+  .deck-volume {
+    flex: 1;
+    min-width: 10rem;
+    max-width: 16rem;
+    margin-left: auto;
+  }
+
+  .queue {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-height: 0;
+    padding: var(--space-4);
+  }
+
+  .add-preview,
+  .item,
+  .person,
+  .approval {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .add-preview {
+    padding: var(--space-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    animation: arrive var(--slow) var(--ease);
+  }
+
+  .add-preview[hidden] {
+    display: none;
+  }
+
+  .item-text {
+    display: grid;
+    gap: 1px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .item-title,
+  .person-name {
+    font-weight: 600;
+  }
+
+  .lists {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .lists h3[hidden] {
+    display: none;
+  }
+
+  .items,
+  .people,
+  .approvals {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .item,
+  .person {
+    padding: var(--space-1) 0;
+  }
+
+  .item [hidden],
+  .person [hidden] {
+    display: none;
+  }
+
+  .approval {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-amber);
+    border-radius: var(--radius-sm);
+    flex-wrap: wrap;
+  }
+
+  .queue-empty {
+    font-size: var(--text-sm);
+  }
+
+  .queue-empty[hidden] {
+    display: none;
+  }
+
+  /* Sheets */
+  .stack {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .row [hidden] {
+    display: none;
+  }
+
+  .row[hidden] {
+    display: none;
+  }
+
+  .setting {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .share {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .share-code {
+    font-size: 2.75rem;
+    letter-spacing: 0.08em;
+  }
+
+  .qr {
+    width: 11rem;
+    padding: var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--color-text);
+  }
+
+  .qr :global(svg) {
+    width: 100%;
+    height: auto;
+  }
+
+  .people {
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .people .logo {
+    border-radius: var(--radius-full);
+  }
+
+  .note {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .record {
+    display: grid;
+    place-items: center;
+    width: 6rem;
+    height: 6rem;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--color-text);
+    color: var(--color-on-light);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    transition:
+      scale var(--fast) var(--ease),
+      background var(--fast) var(--ease);
+  }
+
+  .record[data-recording] {
+    scale: 1.12;
+    background: var(--color-ember);
+    color: var(--color-text);
+  }
+
+  .record:disabled {
+    opacity: 0.35;
+  }
+
+  .note-time {
+    font-size: 2rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Stacked: everything in one column, the queue scrolling beneath the deck. */
+  @media (max-width: 63.99rem) {
+    .room-body {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(12rem, 1fr);
+      gap: var(--space-4);
+      overflow-y: auto;
+    }
+
+    .frame {
+      flex: none;
+      aspect-ratio: 16 / 9;
+      min-height: 0;
+    }
+
+    .lists {
+      overflow: visible;
+    }
+  }
+
+  @media (max-width: 47.99rem) {
+    .rooms {
+      padding: calc(var(--space-4) + env(safe-area-inset-top)) var(--space-4) var(--space-3);
+    }
+
+    .room-head h1 {
+      display: none;
+    }
+
+    .deck-volume {
+      display: none;
+    }
+  }
+</style>

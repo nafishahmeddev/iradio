@@ -8,6 +8,7 @@ import { stationId, type Station, type StationQuery } from '../lib/stations';
 import { countryName } from '../lib/world';
 import { fetchStations } from './directory';
 import { Player } from './player';
+import { initRooms } from './rooms/room';
 import { createScene } from './scene';
 
 const TOP = 'Top worldwide';
@@ -113,6 +114,26 @@ const view = {
 };
 
 const selectedStation = () => state.stations[state.selected];
+
+// ---------------------------------------------------------------- radio or rooms
+
+const appElement = document.querySelector<HTMLElement>('.app')!;
+let shown: 'radio' | 'rooms' = 'radio';
+
+/** Switch between the radio (stage, stations, player bar) and Rooms. */
+function showView(next: 'radio' | 'rooms'): void {
+  if (shown === next) return;
+  shown = next;
+  appElement.dataset['view'] = next;
+  element('rooms').hidden = next !== 'rooms';
+  render();
+}
+
+const rooms = initRooms({
+  toast: (message) => toast(message),
+  entered: () => player.stop(),
+  changed: (inRoom) => appElement.toggleAttribute('data-in-room', inRoom),
+});
 /** The station's country by its short everyday name, whichever catalogue it came from. */
 const place = (station: Station) =>
   station.countrycode ? countryName(station.countrycode) : station.country;
@@ -194,6 +215,7 @@ function load(offset = 0): void {
 }
 
 function browse(kind: Kind, mode: string, query: StationQuery): void {
+  showView('radio');
   if (kind !== 'search') view.search.value = '';
   state.kind = kind;
   state.mode = mode;
@@ -202,6 +224,7 @@ function browse(kind: Kind, mode: string, query: StationQuery): void {
 }
 
 function showFavorites(): void {
+  showView('radio');
   request?.abort();
   state.loading = false;
   state.loadError = '';
@@ -226,7 +249,9 @@ function select(index: number): void {
 function play(): void {
   const station = selectedStation();
   if (!station) return;
-  player.play(station);
+  // In a room, a station joins the room's queue instead of playing on this device alone.
+  if (rooms.inRoom()) rooms.addStation(station);
+  else player.play(station);
 }
 
 function pause(): void {
@@ -323,6 +348,10 @@ function chooseCountry(button: HTMLElement): void {
 const paging = () => state.kind !== 'saved' && !state.loading;
 
 const actions: Record<string, () => void> = {
+  rooms: () => {
+    showView('rooms');
+    rooms.show();
+  },
   toggle,
   stop: () => player.stop(),
   'favorite-current': () => toggleFavorite(player.current),
@@ -463,7 +492,8 @@ function renderLibrary(): void {
     state.kind === 'saved' || (state.offset === 0 && !state.more);
   view.page.textContent = String(state.offset / PAGE_SIZE + 1);
   for (const place of document.querySelectorAll<HTMLElement>('[data-kind]')) {
-    place.setAttribute('aria-pressed', String(place.dataset['kind'] === state.kind));
+    const current = shown === 'rooms' ? 'rooms' : state.kind;
+    place.setAttribute('aria-pressed', String(place.dataset['kind'] === current));
   }
 }
 
@@ -690,6 +720,8 @@ const keys: Record<string, () => void> = {
 
 document.addEventListener('keydown', (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey) return;
+  // The radio's shortcuts belong to the radio; a room is driven by its own controls.
+  if (shown === 'rooms' && event.key !== '?') return;
   if (document.querySelector('dialog[open]')) {
     // ? toggles the shortcuts; every other key belongs to the open dialog.
     if (event.key === '?' && view.helpDialog.open) view.helpDialog.close();
@@ -771,8 +803,10 @@ const tokens = getComputedStyle(document.documentElement);
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const drawing = createScene(element<HTMLCanvasElement>('scene'), {
-  anchor: element('art'),
-  read: () => player.read(),
+  // In Rooms the video is the picture, so the backdrop keeps to its light and draws no ripples.
+  anchor: () => (shown === 'rooms' ? null : element('art')),
+  // A room's audio comes from players the page cannot read, so the ripples keep to their ambient swell.
+  read: () => (shown === 'rooms' || rooms.inRoom() ? (rooms.sounding() ? 'unreadable' : null) : player.read()),
   colors: {
     ink: tokens.getPropertyValue('--color-ink'),
     amber: tokens.getPropertyValue('--color-amber'),
@@ -791,4 +825,6 @@ toast(favorites.warning);
 
 load();
 requestAnimationFrame(tick);
+// A room's link opens straight into Rooms.
+if (window.location.pathname.startsWith('/r/')) actions['rooms']!();
 toast(favorites.warning);

@@ -1,18 +1,24 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "iradio",
-  // The "Nafish Ahmed" Cloudflare account. Pinned so a deploy cannot land in another account.
-  "account_id": "d432cc0bfc8bf14ee77375746659e504",
+  // The "iRadio" Cloudflare account. Pinned so a deploy cannot land in another account.
+  // The earlier copy at iradio.idexa.app lives in a different account and is
+  // deliberately not deployed to from here any more.
+  "account_id": "6f0b759c224c9c7f5db0e2eb6b689cbf",
   // Served at this domain; Cloudflare creates the DNS record and certificate.
-  "routes": [{ "pattern": "iradio.idexa.app", "custom_domain": true }],
-  "main": "worker/index.ts",
+  "routes": [{ "pattern": "app.theradio.click", "custom_domain": true }],
+  "workers_dev": false,
+  "main": "worker/main.ts",
   "compatibility_date": "2026-09-01",
   // The built site. Cloudflare serves these files itself; only /api/* runs the Worker.
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"],
+    "run_worker_first": ["/api/*", "/r/*"],
     "not_found_handling": "404-page"
   },
+  // One Durable Object per room. SQLite-backed, the kind the free plan includes.
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }],
   "observability": { "enabled": true }
 }

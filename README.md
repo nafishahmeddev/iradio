@@ -14,7 +14,7 @@ ago. It installs as an app on phones and desktops.
 | Part | What | Where |
 | --- | --- | --- |
 | Site | [Astro](https://astro.build/), built to static files; no UI framework | `src/` |
-| API | [Hono](https://hono.dev/) on a Cloudflare Worker; one route, station search | `worker/` |
+| API | [Hono](https://hono.dev/) on a Cloudflare Worker: station search, and rooms on Durable Objects | `worker/` |
 | Hosting | Cloudflare serves the static files itself; only `/api/*` runs the Worker | `wrangler.jsonc` |
 | Audio | Plays straight from each broadcaster, so listening uses none of your bandwidth | `src/scripts/player.ts` |
 
@@ -80,6 +80,28 @@ continent, a genre picker, search by name, and saved stations.
 
 On an `https://` page a browser will not load `http://` audio, so searches
 leave those stations out rather than list what cannot play.
+
+## Rooms
+
+Listen together. One person creates a room and shares its code, link or QR
+code; everyone adds songs to one queue, and any device can choose to play
+along in step.
+
+- **Songs** come from YouTube, SoundCloud or direct audio links, and any radio
+  station in the app can be queued too. Audio plays from the source on each
+  device; none of it passes through the server.
+- **The room owns the timeline**, not the host's phone, so the host losing
+  signal does not stop the music. Devices line up on a shared clock and
+  stay within a few hundredths of a second of each other: small gaps are
+  closed by briefly playing slightly faster or slower, large ones by a jump.
+- **Voice notes**: hold to record up to 20 seconds, listen back, send. The
+  music fades while a note plays.
+- **The server** is one Cloudflare Durable Object per room (`worker/room.ts`).
+  It sleeps between messages. Every rule lives in `src/lib/rooms/room.ts` as a
+  plain function with tests.
+
+The plan and architecture are in [docs/rooms-plan.md](docs/rooms-plan.md) and
+[docs/rooms-architecture.md](docs/rooms-architecture.md).
 
 ## Installed app
 
