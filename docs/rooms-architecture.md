@@ -173,9 +173,11 @@ voice-note fade are written once against this interface.
 
 ### Staying in step
 
-`follower.ts` is the loop already proven in the lab: every few seconds,
-compare where the player is with where the timeline says it should be, and
-jump if it is more than 0.35 seconds off. It sends nothing to the server.
+The follow loop in `src/scripts/rooms/room.ts` starts each song once and then
+leaves the player alone. Once a second it compares where the player is with
+where the timeline says it should be, and jumps only if two readings in a row
+are more than 5 seconds off. Smooth playing matters more than exact timing: a
+correction interrupts the sound. It sends nothing to the server.
 
 ### The shared clock
 

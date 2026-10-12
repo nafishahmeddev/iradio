@@ -5,7 +5,6 @@
  * has been started once keeps that permission for the songs that follow.
  */
 
-import { between, STALE_MS, type Rates } from '../../lib/rooms/follow';
 import { STEADY_MS } from '../../lib/rooms/limits';
 import { fileTitle } from '../../lib/rooms/links';
 import type { Source } from '../../lib/rooms/room';
@@ -17,9 +16,6 @@ export interface RoomPlayer {
   pause: () => void;
   seek: (seconds: number) => void;
   position: () => Promise<number>;
-  /** What this player can do about its speed, and the means to do it. */
-  readonly rates: Rates;
-  rate: (speed: number) => void;
   /** 0 to 1. */
   volume: (level: number) => void;
   playing: () => boolean;
@@ -60,7 +56,6 @@ interface YouTubeApi {
   getDuration: () => number;
   getPlayerState: () => number;
   setVolume: (percent: number) => void;
-  setPlaybackRate: (rate: number) => void;
   mute: () => void;
   getVideoData: () => { title?: string; isLive?: boolean };
   destroy: () => void;
@@ -120,20 +115,8 @@ function youtube(hooks: Hooks): RoomPlayer {
   picture.append(slot);
   let api: YouTubeApi | undefined;
   let cued: (() => void) | undefined;
-  let speed = 1;
   /** When the player last started, stopped or began buffering. */
   let changedAt = 0;
-  // YouTube reports its position only a few times a second. Noting the moment each
-  // report arrives lets the true position between reports be worked out.
-  let reported = 0;
-  let reportedAt = 0;
-  window.setInterval(() => {
-    const value = api?.getCurrentTime();
-    if (value !== undefined && value !== reported) {
-      reported = value;
-      reportedAt = performance.now();
-    }
-  }, 25);
   const isPlaying = () => api?.getPlayerState() === window.YT?.PlayerState['PLAYING'];
 
   const start = async (id: string) => {
@@ -176,14 +159,7 @@ function youtube(hooks: Hooks): RoomPlayer {
     play: () => api?.playVideo(),
     pause: () => api?.pauseVideo(),
     seek: (seconds) => api?.seekTo(seconds, true),
-    // A report too old to trust gives no position at all, so nothing is decided on it.
-    position: async () => (performance.now() - reportedAt > STALE_MS ? Number.NaN : between(reported, reportedAt, performance.now(), speed, isPlaying())),
-    rates: 'steps',
-    rate: (next) => {
-      if (next === speed) return;
-      speed = next;
-      api?.setPlaybackRate(next);
-    },
+    position: async () => api?.getCurrentTime() ?? Number.NaN,
     volume: (level) => api?.setVolume(Math.round(level * 100)),
     // Buffering counts: it is what a playing video does for a moment after jumping to a new position.
     playing: () => {
@@ -238,8 +214,6 @@ function soundcloud(hooks: Hooks): RoomPlayer {
     seek: (seconds) => api?.seekTo(seconds * 1000),
     position: () => new Promise((resolve) => (api ? api.getPosition((ms) => resolve(ms / 1000)) : resolve(0))),
     // SoundCloud's player has no speed control.
-    rates: 'none',
-    rate: () => undefined,
     volume: (level) => api?.setVolume(Math.round(level * 100)),
     playing: () => !paused,
     settled: () => !paused,
@@ -273,10 +247,6 @@ function audio(hooks: Hooks): RoomPlayer {
       if (Number.isFinite(element.duration)) element.currentTime = Math.min(seconds, element.duration);
     },
     position: async () => element.currentTime,
-    rates: 'fine',
-    rate: (next) => {
-      element.playbackRate = next;
-    },
     volume: (level) => {
       element.volume = level;
     },

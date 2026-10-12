@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { makeCode, tidyCode } from '../../src/lib/rooms/code';
-import { between, confirmed, correct, envelope, glide, learnLead } from '../../src/lib/rooms/follow';
+import { correct, envelope, glide, learnLead } from '../../src/lib/rooms/follow';
 import { fileTitle, parseLink } from '../../src/lib/rooms/links';
 import { CODE_ALPHABET, EMPTY_ROOM_MS, HEAD_START_MS, HOST_AWAY_MS, ROOM_LIFE_MS } from '../../src/lib/rooms/limits';
 import { parseEvent, viewFor } from '../../src/lib/rooms/protocol';
@@ -419,47 +419,19 @@ describe('messages from a device', () => {
 });
 
 describe('staying in step', () => {
-  it('leaves a player alone when it is within 40 ms', () => {
-    expect(correct(0.03, 50, 'steps', 0)).toEqual({ kind: 'none' });
-    expect(correct(-0.03, 50, 'fine', 0)).toEqual({ kind: 'none' });
+  it('leaves a player alone while it is within the allowed drift', () => {
+    expect(correct(0, 0.4, 50, 0, 5)).toEqual({ kind: 'none' });
+    expect(correct(-4.9, -4.9, 50, 0, 5)).toEqual({ kind: 'none' });
   });
 
-  it('closes a small gap by changing speed for exactly as long as it takes', () => {
-    // 0.4 s ahead at three-quarter speed loses 0.25 s per second: 1.6 s.
-    expect(correct(0.4, 50, 'steps', 0)).toEqual({ kind: 'rate', rate: 0.75, forMs: 1600 });
-    expect(correct(-0.5, 50, 'steps', 0)).toEqual({ kind: 'rate', rate: 1.25, forMs: 2000 });
+  it('jumps a player that is too far off, aiming ahead by the time a jump takes', () => {
+    expect(correct(-6, -6.2, 50, 0.4, 5)).toEqual({ kind: 'seek', to: 50.4 });
+    expect(correct(7, 7, 50, 0, 5)).toEqual({ kind: 'seek', to: 50 });
   });
 
-  it('uses an inaudibly small speed change where any speed is possible', () => {
-    expect(correct(0.05, 50, 'fine', 0)).toEqual({ kind: 'rate', rate: 0.97, forMs: 1000 });
-    expect(correct(-0.9, 50, 'fine', 0)).toEqual({ kind: 'rate', rate: 1.08, forMs: 1000 });
-  });
-
-  it('jumps when the gap is too large, aiming ahead by the time a jump takes', () => {
-    expect(correct(-3, 50, 'steps', 0.4)).toEqual({ kind: 'seek', to: 50.4 });
-    expect(correct(1.5, 50, 'fine', 0.2)).toEqual({ kind: 'seek', to: 50.2 });
-  });
-
-  it('leaves a coarse player alone until it has drifted far enough to matter', () => {
-    expect(correct(0.1, 50, 'steps', 0)).toEqual({ kind: 'none' });
-    expect(correct(-0.28, 50, 'steps', 0)).toEqual({ kind: 'none' });
-    expect(correct(-0.32, 50, 'steps', 0)).toEqual({ kind: 'rate', rate: 1.25, forMs: 1280 });
-  });
-
-  it('closes the gap by speed just after a jump, and jumps again only when far off', () => {
-    expect(correct(-2, 50, 'steps', 0.4, true)).toEqual({ kind: 'rate', rate: 1.25, forMs: 8000 });
-    expect(correct(-3, 50, 'steps', 0.4, true)).toEqual({ kind: 'seek', to: 50.4 });
-  });
-
-  it('acts on a gap only when two readings in a row agree', () => {
-    expect(confirmed(0, -0.3)).toBe(false);
-    expect(confirmed(0.3, -0.3)).toBe(false);
-    expect(confirmed(-0.2, -0.3)).toBe(true);
-  });
-
-  it('only jumps a fixed-speed player once the gap is plainly audible', () => {
-    expect(correct(0.2, 50, 'none', 0.3)).toEqual({ kind: 'none' });
-    expect(correct(0.3, 50, 'none', 0.3)).toEqual({ kind: 'seek', to: 50.3 });
+  it('does not act on one reading alone', () => {
+    expect(correct(0, -8, 50, 0, 5)).toEqual({ kind: 'none' });
+    expect(correct(8, -8, 50, 0, 5)).toEqual({ kind: 'none' });
   });
 
   it('learns how long this device takes to land a jump', () => {
@@ -470,13 +442,6 @@ describe('staying in step', () => {
     expect(learnLead(1.9, -5)).toBe(2);
   });
 
-  it('works out the position between a player\'s reports', () => {
-    expect(between(10, 1000, 1200, 1, true)).toBeCloseTo(10.2);
-    expect(between(10, 1000, 1200, 1.25, true)).toBeCloseTo(10.25);
-    expect(between(10, 1000, 1200, 1, false)).toBe(10);
-    // A stalled player is not assumed to have run on.
-    expect(between(10, 1000, 9000, 1, true)).toBeCloseTo(10.6);
-  });
 });
 
 describe('fades', () => {

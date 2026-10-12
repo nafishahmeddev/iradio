@@ -4,16 +4,14 @@ import qrcode from 'qrcode-generator';
 
 import { duration } from '../../lib/format';
 import { tidyCode } from '../../lib/rooms/code';
-import { confirmed, correct, envelope, glide, learnLead } from '../../lib/rooms/follow';
+import { correct, envelope, glide, learnLead } from '../../lib/rooms/follow';
 import { parseLink } from '../../lib/rooms/links';
 import {
   DUCK_LEVEL,
   FADE_IN_SECONDS,
   FADE_OUT_SECONDS,
   GLIDE_MS,
-  LOCK_SECONDS,
-  REJUMP_WINDOW_MS,
-  CALM_MS,
+  DRIFT_ALLOWED_SECONDS,
   MAX_SONG_SECONDS,
   MAX_WAITING,
   MAX_WAITING_EACH,
@@ -222,12 +220,7 @@ export function initRooms(host: RoomsHost): Rooms {
   /** No judging the position before this moment: a jump is still landing. */
   let settleUntil = 0;
   let jumped = false;
-  let jumpedAt = 0;
-  /** A changed speed returns to normal at this moment. */
-  let rateUntil = 0;
   let checking = false;
-  /** The item being run silently ahead of its start, so it is already going when the moment comes. */
-  let primed = '';
 
   const players = createPlayers({
     failed: (reason) => {
@@ -270,7 +263,6 @@ export function initRooms(host: RoomsHost): Rooms {
   };
 
   function silence(): void {
-    player?.rate(1);
     player?.pause();
     phase = 'idle';
     loaded = '';
@@ -292,11 +284,9 @@ export function initRooms(host: RoomsHost): Rooms {
       return;
     }
     if (item.id !== loaded) {
-      player?.rate(1);
       player?.pause();
       loaded = item.id;
       phase = 'loading';
-      rateUntil = 0;
       unavailable = '';
       blocked = false;
       const next = (player = players(item.source.kind));
@@ -312,48 +302,32 @@ export function initRooms(host: RoomsHost): Rooms {
     const wanted = room.pausedAt ?? (now() - room.startAt) / 1000;
     if (room.pausedAt !== null) {
       if (phase !== 'paused') {
-        player.rate(1);
-        rateUntil = 0;
         player.pause();
         if (item.seconds > 0) player.seek(wanted);
         phase = 'paused';
       }
       return;
     }
-    const lead = leads.get(player) ?? 0;
     edge = envelope(wanted, item.seconds, FADE_IN_SECONDS, FADE_OUT_SECONDS);
     if (wanted < 0) {
-      if (phase !== 'armed') {
-        phase = 'armed';
-        // Run a song silently through its head start, so it is warm and already
-        // moving when its moment comes. A live station has nothing to warm up.
-        if (item.seconds > 0 && primed !== item.id) {
-          primed = item.id;
-          applied = 0;
-          player.volume(0);
-          player.rate(1);
-          player.seek(0);
-          player.play();
-        }
-      }
+      phase = 'armed';
       return;
     }
     if (item.seconds > 0 && wanted > item.seconds) return;
     if (phase !== 'playing') {
-      player.rate(1);
-      if (item.seconds > 0) player.seek(wanted + lead);
-      // Joining a song already under way: stay silent until in step, then fade in.
-      gate = wanted > FADE_IN_SECONDS ? 0 : 1;
+      // A song at its beginning simply starts. One already under way is jumped to,
+      // and stays silent until it has landed, then fades in.
+      const joining = wanted > FADE_IN_SECONDS;
+      if (item.seconds > 0 && joining) player.seek(wanted + (leads.get(player) ?? 0));
+      gate = joining ? 0 : 1;
       player.play();
       phase = 'playing';
       startedAt = performance.now();
       checkedAt = 0;
-      jumped = item.seconds > 0;
-      jumpedAt = performance.now();
+      jumped = item.seconds > 0 && joining;
       // The first reading has nothing before it to agree with; do not let an old one stand in.
       drift = 0;
       settleUntil = performance.now() + 1200;
-      rateUntil = 0;
       return;
     }
     const clock = performance.now();
@@ -364,15 +338,9 @@ export function initRooms(host: RoomsHost): Rooms {
     }
     // In step or not, do not keep a listener in silence: open the gate after a few seconds regardless.
     if (gate === 0 && clock - startedAt > 6000) gate = 1;
-    if (rateUntil && clock >= rateUntil) {
-      rateUntil = 0;
-      player.rate(1);
-      // A change of speed on a video can be heard; give it a long rest before judging again.
-      if (player.rates === 'steps') settleUntil = clock + CALM_MS;
-    }
     // A live station has no position to keep to. Otherwise judge the position once a
-    // second, but not while a jump is landing or a speed change is still closing the gap.
-    if (item.seconds === 0 || checking || clock < settleUntil || rateUntil || clock - checkedAt < 1000 || !player.settled()) return;
+    // second, but never while the player is still loading or a jump is landing.
+    if (item.seconds === 0 || checking || clock < settleUntil || clock - checkedAt < 1000 || !player.settled()) return;
     checkedAt = clock;
     checking = true;
     const current = player;
@@ -381,7 +349,7 @@ export function initRooms(host: RoomsHost): Rooms {
       if (current !== player || phase !== 'playing' || !room || room.pausedAt !== null || !current.settled() || !Number.isFinite(actual)) return;
       const target = (now() - room.startAt) / 1000;
       const error = actual - target;
-      if (Math.abs(error) < LOCK_SECONDS) gate = 1;
+      if (Math.abs(error) < DRIFT_ALLOWED_SECONDS) gate = 1;
       // The first reading after a jump shows how far off the jump landed: learn from it.
       if (jumped) {
         jumped = false;
@@ -389,18 +357,11 @@ export function initRooms(host: RoomsHost): Rooms {
       }
       const before = drift;
       drift = error;
-      const fix = correct(error, target, current.rates, leads.get(current) ?? 0, performance.now() - jumpedAt < REJUMP_WINDOW_MS);
-      // A single odd reading is not acted on; smooth sound matters more than chasing it.
-      if (fix.kind === 'none' || !confirmed(before, error)) return;
-      if (fix.kind === 'rate') {
-        current.rate(fix.rate);
-        rateUntil = performance.now() + fix.forMs;
-      } else {
-        current.seek(fix.to);
-        jumped = true;
-        jumpedAt = performance.now();
-        settleUntil = performance.now() + 1200;
-      }
+      const fix = correct(before, error, target, leads.get(current) ?? 0, DRIFT_ALLOWED_SECONDS);
+      if (fix.kind === 'none') return;
+      current.seek(fix.to);
+      jumped = true;
+      settleUntil = performance.now() + 1200;
     });
   }
 

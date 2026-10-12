@@ -35,14 +35,14 @@ export const FADE_IN_SECONDS = 1.2;
 export const FADE_OUT_SECONDS = 2.5;
 /** How long any change of loudness takes to arrive, so nothing ever snaps. */
 export const GLIDE_MS = 500;
-/** A device joining mid-song stays silent until it is this close to the timeline, then fades in. */
-export const LOCK_SECONDS = 0.3;
-/** For this long after a jump, the remaining gap is closed by speed and not by another jump. */
-export const REJUMP_WINDOW_MS = 10_000;
+/**
+ * How far a device may be from the room's timeline before it is corrected. Wide on
+ * purpose: a correction interrupts the sound, and smooth playing matters more than exact timing.
+ */
+export const DRIFT_ALLOWED_SECONDS = 5;
 /** A player must have played without a break for this long before its position is judged. */
 export const STEADY_MS = 1500;
-/** After a correction, a player whose corrections can be heard is left alone for this long. */
-export const CALM_MS = 8000;
+
 
 export const HOST_AWAY_MS = 60_000;
 export const EMPTY_ROOM_MS = 30 * 60_000;
