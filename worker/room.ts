@@ -152,6 +152,8 @@ export class Room extends DurableObject {
   /** Save the outcome of an event and tell everyone what the room now looks like. */
   private async commit(outcome: Outcome, now: number, leaving?: WebSocket): Promise<void> {
     this.state = outcome.state;
+    // The reason a song could not play is known only to the host's device; keep it for whoever runs the site.
+    if (outcome.failed) console.warn('Song skipped as unplayable:', outcome.failed);
     await this.save(now);
     if (outcome.dropped.length) await this.ctx.storage.delete(outcome.dropped.map((id) => `note:${id}`));
 

@@ -140,6 +140,15 @@ describe('the API', () => {
     expect(foreign.status).toBe(403);
   });
 
+  it('says rooms are unavailable when the room server cannot be reached', async () => {
+    const down = { ...env, ROOMS: { idFromName: (name: string) => name, get: () => ({ fetch: async () => Promise.reject(new Error('quota')) }) } };
+    for (const [path, method] of [['/api/rooms?device=d', 'POST'], ['/api/rooms/K7M2QX/live', 'GET']] as const) {
+      const response = await app.request(path, { method }, down);
+      expect(response.status, path).toBe(503);
+      expect(await response.json()).toEqual({ error: 'unavailable' });
+    }
+  });
+
   it('has nothing else under /api', async () => {
     expect((await app.request('/api/stream', {}, env)).status).toBe(404);
   });

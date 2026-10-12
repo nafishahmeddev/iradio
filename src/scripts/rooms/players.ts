@@ -33,8 +33,8 @@ export interface Details {
 }
 
 interface Hooks {
-  /** The item cannot be played on this device. */
-  failed: () => void;
+  /** The item cannot be played on this device; the reason is a short code such as `youtube-150`. */
+  failed: (reason: string) => void;
 }
 
 // ------------------------------------------------------------------ loading the outside players
@@ -149,7 +149,7 @@ function youtube(hooks: Hooks): RoomPlayer {
           onStateChange: (event: { data: number }) => {
             if (event.data === window.YT!.PlayerState['CUED']) cued?.();
           },
-          onError: () => hooks.failed(),
+          onError: (event: { data: number }) => hooks.failed(`youtube-${event.data}`),
         },
       });
     });
@@ -200,7 +200,7 @@ function soundcloud(hooks: Hooks): RoomPlayer {
     api!.bind(events['PLAY']!, () => (paused = false));
     api!.bind(events['PAUSE']!, () => (paused = true));
     api!.bind(events['FINISH']!, () => (paused = true));
-    api!.bind(events['ERROR']!, () => hooks.failed());
+    api!.bind(events['ERROR']!, () => hooks.failed('soundcloud'));
   };
 
   return {
@@ -241,7 +241,7 @@ function soundcloud(hooks: Hooks): RoomPlayer {
 function audio(hooks: Hooks): RoomPlayer {
   const element = new Audio();
   element.preload = 'auto';
-  element.addEventListener('error', () => element.src && hooks.failed());
+  element.addEventListener('error', () => element.src && hooks.failed(`audio-${element.error?.code ?? 0}`));
   return {
     picture: null,
     load(source) {

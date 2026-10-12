@@ -15,6 +15,7 @@
     "build": "npm run catalogue && astro build",
     "preview": "npm run build && wrangler dev --port 8787",
     "deploy": "npm run build && wrangler deploy",
+    "deploy:idexa": "npm run build && wrangler deploy -c wrangler.idexa.jsonc",
     "check": "astro check && tsc -p worker",
     "test": "vitest run"
   },

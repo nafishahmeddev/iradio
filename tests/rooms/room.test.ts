@@ -253,10 +253,11 @@ describe('skipping', () => {
     room.join('g1', 'Maya');
     room.act('host', song('a'));
     const id = room.state.current!.id;
-    room.act('g1', { type: 'failed', item: id });
+    room.act('g1', { type: 'failed', item: id, reason: 'youtube-150' });
     expect(room.state.current?.id).toBe(id);
-    room.act('host', { type: 'failed', item: id });
+    const outcome = room.act('host', { type: 'failed', item: id, reason: 'youtube-150' });
     expect(room.state.current).toBeNull();
+    expect(outcome.notice).toBe('Skipped “Song a”. Its owner does not allow it outside YouTube.');
   });
 });
 

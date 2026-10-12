@@ -122,7 +122,7 @@ export type RoomEvent =
   | { type: 'note'; id: string; seconds: number; when: 'now' | 'after' }
   | { type: 'note-approve'; id: string }
   | { type: 'note-discard'; id: string }
-  | { type: 'failed'; item: string }
+  | { type: 'failed'; item: string; reason: string }
   | { type: 'wake' };
 
 /** Why an event was refused; the app turns each into the plan's words. */
@@ -148,6 +148,8 @@ export interface Outcome {
   refused?: Refusal;
   /** A line everyone in the room should see, such as a change of host. */
   notice?: string;
+  /** Why the host's device could not play the song just skipped; for the log. */
+  failed?: string;
   /** Voice notes whose audio can now be deleted. */
   dropped: string[];
   /** Devices to disconnect: a removed person, or everyone when the room ends. */
@@ -233,6 +235,13 @@ function advance(state: RoomState, now: number): void {
   state.pausedAt = null;
   scheduleNotes(state, now - NOTE_LEAD_MS + NOTE_SPACING_MS, () => true);
   state.startAt = Math.max(now, state.busyUntil) + HEAD_START_MS;
+}
+
+/** Why a song could not play, in words; the reason is the code the player gave. */
+function whyUnplayable(reason: string): string {
+  if (reason === 'youtube-101' || reason === 'youtube-150') return 'Its owner does not allow it outside YouTube.';
+  if (reason === 'youtube-100') return 'It was removed or made private.';
+  return 'It would not play.';
 }
 
 /** When the room next needs to act by itself, or null if only a person can change it. */
@@ -390,7 +399,12 @@ export function apply(before: RoomState, device: string, event: RoomEvent, now: 
 
     case 'failed': {
       // Only the host's device decides that an item cannot play at all.
-      if (isHost && state.current?.id === event.item) advance(state, now);
+      if (isHost && state.current?.id === event.item) {
+        // Say what happened: a song that vanishes without a word looks like a fault in the room.
+        outcome.notice = `Skipped “${state.current.title}”. ${whyUnplayable(event.reason)}`;
+        outcome.failed = event.reason;
+        advance(state, now);
+      }
       return outcome;
     }
 

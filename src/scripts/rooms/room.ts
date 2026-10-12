@@ -54,7 +54,8 @@ const HUES = [30, 200, 280, 140, 340, 50, 170, 250];
 const LOBBY_ORBS = [30, 280, 200, 340].map((hue) => ({ hue, energy: 0.1 }));
 
 /** The plan's words for each reason the room can refuse something. */
-const REFUSALS: Record<Refusal | 'none', string> = {
+const REFUSALS: Record<Refusal | 'none' | 'unavailable', string> = {
+  unavailable: 'Rooms are unavailable right now. Please try again later.',
   ended: 'This room has ended',
   locked: 'This room is locked',
   full: 'This room is full',
@@ -226,11 +227,11 @@ export function initRooms(host: RoomsHost): Rooms {
   let primed = '';
 
   const players = createPlayers({
-    failed: () => {
+    failed: (reason) => {
       const item = room?.current;
       if (!item || item.id !== loaded) return;
       // Only the host's device decides an item cannot play for anyone.
-      if (room?.you.host) connection?.send({ type: 'failed', item: item.id });
+      if (room?.you.host) connection?.send({ type: 'failed', item: item.id, reason });
       else {
         unavailable = item.id;
         render();
@@ -299,7 +300,7 @@ export function initRooms(host: RoomsHost): Rooms {
       showPicture(next.picture);
       next.load(item.source).then(
         () => item.id === loaded && (phase = 'idle'),
-        () => item.id === loaded && room?.you.host && connection?.send({ type: 'failed', item: item.id }),
+        () => item.id === loaded && room?.you.host && connection?.send({ type: 'failed', item: item.id, reason: 'load' }),
       );
       return;
     }
@@ -549,6 +550,10 @@ export function initRooms(host: RoomsHost): Rooms {
         const params = new URLSearchParams({ device, name: `${name}'s room` });
         const response = await fetch(`/api/rooms?${params}`, { method: 'POST' });
         const body = (await response.json()) as { code?: string };
+        if (response.status >= 500) {
+          view.lobbyProblem.textContent = REFUSALS.unavailable;
+          return;
+        }
         if (!response.ok || !body.code) throw new Error('failed');
         enter(body.code);
       } catch {

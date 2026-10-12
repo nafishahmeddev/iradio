@@ -8,7 +8,7 @@ export interface ConnectionHandlers {
   /** connected, or trying again after a drop. */
   status: (status: 'connected' | 'reconnecting') => void;
   /** The room refused the join; nothing will retry. */
-  refused: (reason: Refusal | 'none') => void;
+  refused: (reason: Refusal | 'none' | 'unavailable') => void;
 }
 
 const RETRY_SECONDS = [1, 2, 4, 8, 15];
@@ -82,7 +82,8 @@ export class Connection {
     try {
       const response = await fetch(`/api/rooms/${this.code}/notes/none`);
       this.closed = true;
-      this.handlers.refused(response.status === 410 ? 'ended' : response.status === 404 && (await response.json()).error === 'none' ? 'none' : 'ended');
+      const reason = ((await response.json().catch(() => ({}))) as { error?: string }).error;
+      this.handlers.refused(response.status === 410 ? 'ended' : response.status >= 500 ? 'unavailable' : reason === 'none' ? 'none' : 'ended');
     } catch {
       this.handlers.status('reconnecting');
       this.attempt++;

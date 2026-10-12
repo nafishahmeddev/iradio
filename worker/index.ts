@@ -78,6 +78,16 @@ app.get(
 // The clock every device in a room sets itself by.
 app.get('/api/time', (c) => c.json({ now: Date.now() }, 200, { 'Cache-Control': 'no-store' }));
 
+/**
+ * The room server could not be reached at all, for instance when the account's
+ * daily allowance is used up. Said plainly, so the app can tell people.
+ */
+function unavailable(c: { json: (body: unknown, status: 503) => Response }, cause?: unknown): Response {
+  // People are told only that rooms are unavailable; the reason goes to the log for whoever runs the site.
+  console.error('Room server unreachable:', cause instanceof Error ? cause.message : String(cause ?? 'no free code found'));
+  return c.json({ error: 'unavailable' }, 503);
+}
+
 const room = (rooms: Rooms, code: string) => rooms.get(rooms.idFromName(code) as never);
 
 // A new room: draw a code and claim it; on the rare clash, draw again.
@@ -86,10 +96,14 @@ app.post('/api/rooms', async (c) => {
   for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt++) {
     const code = makeCode();
     const target = new URL(`/api/rooms/${code}/create?${params}`, c.req.url);
-    const response = await room(c.env.ROOMS, code).fetch(new Request(target, { method: 'POST' }));
-    if (response.status !== 409) return response;
+    try {
+      const response = await room(c.env.ROOMS, code).fetch(new Request(target, { method: 'POST' }));
+      if (response.status !== 409) return response;
+    } catch (cause) {
+      return unavailable(c, cause);
+    }
   }
-  return c.json({ error: 'busy' }, 503);
+  return unavailable(c);
 });
 
 // Everything else about a room goes to its own object: the live connection and voice notes.
@@ -99,7 +113,9 @@ app.all('/api/rooms/:code/*', (c) => {
   // The live connection must come from this app's own pages, not another site.
   const origin = c.req.header('Origin');
   if (origin && new URL(origin).host !== new URL(c.req.url).host) return c.json({ error: 'forbidden' }, 403);
-  return room(c.env.ROOMS, code).fetch(c.req.raw);
+  return room(c.env.ROOMS, code)
+    .fetch(c.req.raw)
+    .catch((cause: unknown) => unavailable(c, cause));
 });
 
 // A room's link opens the app itself; the app reads the code from the address.

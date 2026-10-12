@@ -133,10 +133,14 @@ export function parseEvent(raw: unknown): RoomEvent | null {
       const image = isStreamUrl(m['image']) && m['image'].startsWith('https:') && m['image'].length <= 500 ? m['image'] : undefined;
       return { type: 'add', source: what, title, seconds, ...(image ? { image } : {}) };
     }
-    case 'remove':
+    case 'remove': {
+      const item = id(m['item']);
+      return item ? { type: 'remove', item } : null;
+    }
     case 'failed': {
       const item = id(m['item']);
-      return item ? { type: m['type'], item } : null;
+      const reason = typeof m['reason'] === 'string' && /^[a-z0-9-]{1,24}$/.test(m['reason']) ? m['reason'] : 'unknown';
+      return item ? { type: 'failed', item, reason } : null;
     }
     case 'listening':
       return typeof m['on'] === 'boolean' ? { type: 'listening', on: m['on'] } : null;
