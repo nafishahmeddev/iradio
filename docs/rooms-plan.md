@@ -74,7 +74,7 @@ When a room closes, its queue and voice notes are deleted.
 | Setting | Choices | Default |
 | --- | --- | --- |
 | Who can add songs | Everyone / Host only | Everyone |
-| Who can send voice notes | Host only / Selected people / Everyone | Selected people |
+| Who can send voice notes | Host only / Selected people / Everyone | Everyone |
 | Approve voice notes first | On / Off | Off |
 | Lock room (no new people) | On / Off | Off |
 

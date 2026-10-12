@@ -19,6 +19,7 @@ const DEVICE = /^[\w-]{16,64}$/;
 /** Messages a device may send in a window; the excess is dropped. */
 const FLOOD_LIMIT = 20;
 const FLOOD_WINDOW_MS = 10_000;
+const MIN_WAKE_MS = 250;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -186,6 +187,8 @@ export class Room extends DurableObject {
     await this.ctx.storage.put('room', room);
     const wake = wakeAt(room);
     if (wake === null) await this.ctx.storage.deleteAlarm();
-    else await this.ctx.storage.setAlarm(Math.max(wake, now + 50));
+    // Never sooner than a quarter second: even if a rule were ever wrong about when to
+    // wake, a room could not spin through the day's request allowance.
+    else await this.ctx.storage.setAlarm(Math.max(wake, now + MIN_WAKE_MS));
   }
 }

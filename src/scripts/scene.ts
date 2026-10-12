@@ -11,6 +11,8 @@ const SPAN = 512;
 /** Points around half the dial; the other half mirrors them. */
 const POINTS = 96;
 const RINGS = 22;
+/** The most people shown as lights at once. */
+const ORBS = 12;
 /** Seconds between one ring leaving the dial and the next. */
 const CADENCE = 0.075;
 /** The innermost ring's radius, measured in radii of the artwork disc it surrounds. */
@@ -24,6 +26,7 @@ void main() {
 
 const FRAGMENT = `#version 300 es
 precision highp float;
+#define ORBS ${ORBS}
 uniform sampler2D uHistory;
 uniform vec2 uResolution;
 uniform vec2 uCenter;
@@ -39,12 +42,15 @@ uniform float uBass;
 uniform float uLive;
 uniform float uMotion;
 uniform float uRipples;
+// People in a room, as lights: xy is the place on screen, z the size, w the brightness.
+uniform vec4 uOrbs[ORBS];
+uniform vec3 uOrbTints[ORBS];
 out vec4 outColor;
 
 const float PI = 3.14159265;
 const float RINGS = ${RINGS}.0;
 /** How far the ripples reach, in dial radii. */
-const float SPREAD = 2.3;
+uniform float uSpread;
 
 /** An integer hash: even, pattern-free noise, unlike the usual sine trick. */
 float hash(vec2 p) {
@@ -105,7 +111,7 @@ void main() {
   color = mix(color, uInk, smoothstep(1.02, 0.9, r) * 0.9 * uRipples);
 
   // Ripples. Ring k left the dial k steps ago and carries the waveform from then.
-  float gap = SPREAD / RINGS;
+  float gap = uSpread / RINGS;
   float position = (r - 1.0) / gap - uPhase;
   float pixel = 1.0 / radius;
   vec3 ripples = vec3(0.0);
@@ -125,6 +131,18 @@ void main() {
     ripples += hue(age) * line * fade;
   }
   color += ripples * mix(0.45, 1.0, uLive) * uRipples;
+
+  // People: each a soft light with a brighter heart, breathing slowly.
+  vec2 shape = vec2(uResolution.x / uResolution.y, 1.0);
+  for (int i = 0; i < ORBS; i++) {
+    vec4 orb = uOrbs[i];
+    if (orb.w < 0.002) continue;
+    vec2 away = (uv - orb.xy) * shape + 0.03 * flow;
+    float d = length(away) / orb.z;
+    float aura = exp(-d * d * 1.6);
+    float heart = exp(-d * d * 14.0);
+    color += uOrbTints[i] * (aura * 0.42 + heart * 0.5) * orb.w;
+  }
 
   // Finish: vignette, then fine film grain. Two samples summed give the soft,
   // bell-shaped grain of real film; it sits in the light, not the blacks.
@@ -153,12 +171,25 @@ export interface SceneOptions {
    */
   read: () => SceneInput | 'unreadable' | null;
   colors: Record<'ink' | 'amber' | 'ember' | 'cool', string>;
+  /** How far the rings reach beyond the disc, in disc radii. */
+  spread: () => number;
+  /** The people to show as lights: a hue each, and how bright (0 to 1). Empty where there are none. */
+  orbs: () => Array<{ hue: number; energy: number }>;
   reducedMotion: () => boolean;
 }
 
 function rgb(hex: string): Rgb {
   const value = Number.parseInt(hex.trim().replace('#', ''), 16);
   return [((value >> 16) & 255) / 255, ((value >> 8) & 255) / 255, (value & 255) / 255];
+}
+
+/** A person's hue as a clear, luminous colour. */
+function hsl(hue: number): Rgb {
+  const channel = (n: number) => {
+    const k = (n + hue / 30) % 12;
+    return 0.6 - 0.28 * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+  };
+  return [channel(0), channel(8), channel(4)];
 }
 
 function compile(gl: WebGL2RenderingContext): WebGLProgram {
@@ -289,6 +320,8 @@ function createRenderer(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, o
   }
 
   let ripples = 1;
+  const orbs = new Float32Array(ORBS * 4);
+  const tints = new Float32Array(ORBS * 3);
 
   return (signal, time) => {
     const { width, height } = canvas;
@@ -323,6 +356,22 @@ function createRenderer(canvas: HTMLCanvasElement, gl: WebGL2RenderingContext, o
     // Ripples fade out, not snap, when the view has nothing for them to surround.
     ripples += ((anchored && anchored.width > 0 ? 1 : 0) - ripples) * 0.08;
     gl.uniform1f(at('uRipples'), ripples);
+    gl.uniform1f(at('uSpread'), options.spread());
+
+    // Each light keeps its own slot and wanders on its own slow path; brightness eases, so people fade in and out.
+    const people = options.orbs();
+    const clock = still ? 0 : time;
+    for (let i = 0; i < ORBS; i++) {
+      const person = people[i];
+      const wanted = person ? 0.35 + 0.65 * person.energy : 0;
+      orbs[i * 4] = 0.5 + 0.36 * Math.sin(clock * 0.05 * (1 + i * 0.13) + i * 2.4);
+      orbs[i * 4 + 1] = 0.52 + 0.32 * Math.cos(clock * 0.04 * (1 + i * 0.17) + i * 1.7);
+      orbs[i * 4 + 2] = 0.17 + 0.03 * Math.sin(clock * 0.3 + i);
+      orbs[i * 4 + 3]! += (wanted - orbs[i * 4 + 3]!) * 0.04;
+      if (person) tints.set(hsl(person.hue), i * 3);
+    }
+    gl.uniform4fv(at('uOrbs[0]'), orbs);
+    gl.uniform3fv(at('uOrbTints[0]'), tints);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   };
 }

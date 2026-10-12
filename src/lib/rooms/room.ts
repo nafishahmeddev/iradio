@@ -9,7 +9,6 @@ import {
   COLOURS,
   EMPTY_ROOM_MS,
   HEAD_START_MS,
-  HISTORY,
   HOST_AWAY_MS,
   MAX_NOTES_WAITING,
   MAX_PEOPLE,
@@ -50,7 +49,6 @@ export interface Item {
   turn: number;
   /** Public IDs of the people who voted to skip. */
   votes: string[];
-  failed?: boolean;
 }
 
 export interface Person {
@@ -97,7 +95,6 @@ export interface RoomState {
   startAt: number;
   /** Position in seconds where the host paused; null while playing. */
   pausedAt: number | null;
-  history: Item[];
   notes: Note[];
   /** Voice notes are playing until this moment. */
   busyUntil: number;
@@ -112,7 +109,6 @@ export type RoomEvent =
   | { type: 'rename'; name: string }
   | { type: 'add'; source: Source; title: string; image?: string; seconds: number }
   | { type: 'remove'; item: string }
-  | { type: 'move'; item: string; to: number }
   | { type: 'skip' }
   | { type: 'pause' }
   | { type: 'resume' }
@@ -166,13 +162,13 @@ export function createRoom(code: string, host: string, name: string, now: number
     host,
     acting: null,
     hostAwayAt: null,
-    settings: { adders: 'everyone', notes: 'selected', approveNotes: false, locked: false },
+    // Open by default: anyone may add songs and send voice notes. The host can tighten either.
+    settings: { adders: 'everyone', notes: 'everyone', approveNotes: false, locked: false },
     people: [],
     queue: [],
     current: null,
     startAt: 0,
     pausedAt: null,
-    history: [],
     notes: [],
     busyUntil: 0,
     emptyAt: now,
@@ -233,7 +229,6 @@ function scheduleNotes(state: RoomState, from: number, which: (note: Note) => bo
 
 /** Finish the current item and start the next, after any voice notes waiting for the gap. */
 function advance(state: RoomState, now: number): void {
-  if (state.current) state.history = [state.current, ...state.history].slice(0, HISTORY);
   state.current = state.queue.shift() ?? null;
   state.pausedAt = null;
   scheduleNotes(state, now - NOTE_LEAD_MS + NOTE_SPACING_MS, () => true);
@@ -245,7 +240,11 @@ export function wakeAt(state: RoomState): number | null {
   if (state.closed) return null;
   const moments = [state.createdAt + ROOM_LIFE_MS];
   if (state.emptyAt !== null) moments.push(state.emptyAt + EMPTY_ROOM_MS);
-  if (state.hostAwayAt !== null && state.acting === null) moments.push(state.hostAwayAt + HOST_AWAY_MS);
+  // Only wake to hand over hosting if someone is there to take it. Without this an
+  // empty room would wake again and again, finding nobody each time.
+  if (state.hostAwayAt !== null && state.acting === null && state.people.some(present)) {
+    moments.push(state.hostAwayAt + HOST_AWAY_MS);
+  }
   if (state.current && state.current.seconds > 0 && state.pausedAt === null) {
     moments.push(state.startAt + state.current.seconds * 1000 + 400);
   }
@@ -376,15 +375,6 @@ export function apply(before: RoomState, device: string, event: RoomEvent, now: 
       return outcome;
     }
 
-    case 'move': {
-      if (!isHost) return refuse('not-allowed');
-      const from = state.queue.findIndex((waiting) => waiting.id === event.item);
-      if (from < 0) return outcome;
-      const [item] = state.queue.splice(from, 1);
-      state.queue.splice(Math.max(0, Math.min(state.queue.length, event.to)), 0, item!);
-      return outcome;
-    }
-
     case 'skip': {
       const current = state.current;
       if (!current) return outcome;
@@ -400,10 +390,7 @@ export function apply(before: RoomState, device: string, event: RoomEvent, now: 
 
     case 'failed': {
       // Only the host's device decides that an item cannot play at all.
-      if (isHost && state.current?.id === event.item) {
-        state.current.failed = true;
-        advance(state, now);
-      }
+      if (isHost && state.current?.id === event.item) advance(state, now);
       return outcome;
     }
 

@@ -803,8 +803,10 @@ const tokens = getComputedStyle(document.documentElement);
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 const drawing = createScene(element<HTMLCanvasElement>('scene'), {
-  // In Rooms the video is the picture, so the backdrop keeps to its light and draws no ripples.
-  anchor: () => (shown === 'rooms' ? null : element('art')),
+  // In a room the rings surround the song's artwork; the lobby has none.
+  anchor: () => (shown === 'rooms' ? rooms.anchor() : element('art')),
+  // A room's rings keep closer to the disc, clear of the text beneath it.
+  spread: () => (shown === 'rooms' ? 1.25 : 2.3),
   // A room's audio comes from players the page cannot read, so the ripples keep to their ambient swell.
   read: () => (shown === 'rooms' || rooms.inRoom() ? (rooms.sounding() ? 'unreadable' : null) : player.read()),
   colors: {
@@ -813,6 +815,7 @@ const drawing = createScene(element<HTMLCanvasElement>('scene'), {
     ember: tokens.getPropertyValue('--color-ember'),
     cool: tokens.getPropertyValue('--color-cool'),
   },
+  orbs: () => (shown === 'rooms' ? rooms.orbs() : []),
   reducedMotion: () => motion.matches,
 });
 document.documentElement.classList.toggle('no-webgl', !drawing);

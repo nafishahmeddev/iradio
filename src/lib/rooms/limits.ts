@@ -13,7 +13,6 @@ export const COLOURS = 8;
 export const MAX_WAITING_EACH = 5;
 export const MAX_WAITING = 100;
 export const MAX_SONG_SECONDS = 15 * 60;
-export const HISTORY = 20;
 
 /** Every device gets this long to load an item before it starts. */
 export const HEAD_START_MS = 3_000;
@@ -30,8 +29,14 @@ export const NOTE_LEAD_MS = 1_500;
 export const NOTE_SPACING_MS = 500;
 /** Music level under a voice note, and the fades around it. */
 export const DUCK_LEVEL = 0.15;
-export const DUCK_DOWN_MS = 500;
-export const DUCK_UP_MS = 800;
+
+/** A song eases in at its start and out at its end. */
+export const FADE_IN_SECONDS = 1.2;
+export const FADE_OUT_SECONDS = 2.5;
+/** How long any change of loudness takes to arrive, so nothing ever snaps. */
+export const GLIDE_MS = 500;
+/** A device joining mid-song stays silent until it is this close to the timeline, then fades in. */
+export const LOCK_SECONDS = 0.1;
 
 export const HOST_AWAY_MS = 60_000;
 export const EMPTY_ROOM_MS = 30 * 60_000;

@@ -31,7 +31,6 @@ export interface RoomView {
   startAt: number;
   pausedAt: number | null;
   queue: ItemView[];
-  history: ItemView[];
   /** Notes with a moment to play, for every listening device. */
   playing: Array<Pick<Note, 'id' | 'byName' | 'colour' | 'seconds' | 'playAt'>>;
   /** Notes the viewer should know about: their own, and for the host those awaiting approval. */
@@ -77,7 +76,6 @@ export function viewFor(state: RoomState, device: string): RoomView {
     startAt: state.startAt,
     pausedAt: state.pausedAt,
     queue: state.queue.map(item),
-    history: state.history.map(item),
     playing: state.notes
       .filter((note) => note.state === 'scheduled')
       .map(({ id, byName, colour, seconds, playAt }) => ({ id, byName, colour, seconds, playAt })),
@@ -139,10 +137,6 @@ export function parseEvent(raw: unknown): RoomEvent | null {
     case 'failed': {
       const item = id(m['item']);
       return item ? { type: m['type'], item } : null;
-    }
-    case 'move': {
-      const item = id(m['item']);
-      return item && Number.isInteger(m['to']) ? { type: 'move', item, to: m['to'] as number } : null;
     }
     case 'listening':
       return typeof m['on'] === 'boolean' ? { type: 'listening', on: m['on'] } : null;

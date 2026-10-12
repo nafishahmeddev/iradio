@@ -55,3 +55,22 @@ export function between(reported: number, reportedAtMs: number, nowMs: number, r
   // A report older than this means the player has stalled; do not run on ahead of it.
   return reported + (Math.min(nowMs - reportedAtMs, 600) / 1000) * rate;
 }
+
+/**
+ * How loud a song should be at a moment in its life, from 0 to 1: it eases in
+ * at the start, out at the end, and is silent before it begins. A station has
+ * no end (`seconds` is 0), so it only eases in.
+ */
+export function envelope(position: number, seconds: number, fadeIn: number, fadeOut: number): number {
+  if (position <= 0) return 0;
+  const rise = Math.min(1, position / fadeIn);
+  if (seconds <= 0) return rise;
+  const fall = Math.max(0, Math.min(1, (seconds - position) / fadeOut));
+  return Math.min(rise, fall);
+}
+
+/** Move a loudness towards its target at a steady pace, however long ago it was last moved. */
+export function glide(current: number, target: number, elapsedMs: number, fullScaleMs: number): number {
+  const step = elapsedMs / fullScaleMs;
+  return current < target ? Math.min(target, current + step) : Math.max(target, current - step);
+}

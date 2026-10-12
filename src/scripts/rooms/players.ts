@@ -123,7 +123,7 @@ function youtube(hooks: Hooks): RoomPlayer {
   let reported = 0;
   let reportedAt = 0;
   window.setInterval(() => {
-    const value = api?.getCurrentTime?.();
+    const value = api?.getCurrentTime();
     if (value !== undefined && value !== reported) {
       reported = value;
       reportedAt = performance.now();
@@ -134,14 +134,18 @@ function youtube(hooks: Hooks): RoomPlayer {
   const start = async (id: string) => {
     await youtubeApi();
     await new Promise<void>((resolve) => {
-      api = new window.YT!.Player(slot, {
+      // The player object exists before it can be used; it is only kept once YouTube says it is ready.
+      const made: YouTubeApi = new window.YT!.Player(slot, {
         videoId: id,
         width: '100%',
         height: '100%',
         // The room, not the viewer, decides where the song is, so the player's own controls are off.
         playerVars: { playsinline: 1, rel: 0, controls: 0, disablekb: 1, fs: 0 },
         events: {
-          onReady: () => resolve(),
+          onReady: () => {
+            api = made;
+            resolve();
+          },
           onStateChange: (event: { data: number }) => {
             if (event.data === window.YT!.PlayerState['CUED']) cued?.();
           },

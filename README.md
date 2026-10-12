@@ -94,6 +94,9 @@ along in step.
   signal does not stop the music. Devices line up on a shared clock and
   stay within a few hundredths of a second of each other: small gaps are
   closed by briefly playing slightly faster or slower, large ones by a jump.
+- **Fades.** Each song eases in and out, a device joining mid-song stays
+  silent until it is in step and then fades in, and no change of loudness is
+  ever abrupt.
 - **Voice notes**: hold to record up to 20 seconds, listen back, send. The
   music fades while a note plays.
 - **The server** is one Cloudflare Durable Object per room (`worker/room.ts`).
@@ -160,5 +163,5 @@ Licensed under the [MIT License](LICENSE). Station data:
 [Radio Browser](https://www.radio-browser.info/) and the
 [International Public Radio Directory](https://github.com/iprd-org/iprd) (MIT).
 Icons: [Phosphor](https://phosphoricons.com/) (MIT). Type:
-[Archivo](https://github.com/Omnibus-Type/Archivo) (OFL). The license covers
+[Instrument Sans](https://github.com/Instrument/instrument-sans) (OFL). The license covers
 this repository's code; it grants no rights to third-party broadcasts.

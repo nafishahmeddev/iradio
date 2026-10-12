@@ -4,12 +4,14 @@ import qrcode from 'qrcode-generator';
 
 import { duration } from '../../lib/format';
 import { tidyCode } from '../../lib/rooms/code';
-import { correct, learnLead } from '../../lib/rooms/follow';
+import { correct, envelope, glide, learnLead } from '../../lib/rooms/follow';
 import { parseLink } from '../../lib/rooms/links';
 import {
-  DUCK_DOWN_MS,
   DUCK_LEVEL,
-  DUCK_UP_MS,
+  FADE_IN_SECONDS,
+  FADE_OUT_SECONDS,
+  GLIDE_MS,
+  LOCK_SECONDS,
   MAX_SONG_SECONDS,
   MAX_WAITING,
   MAX_WAITING_EACH,
@@ -41,9 +43,15 @@ export interface Rooms {
   addStation: (station: Station) => void;
   /** True while this device is playing the room's audio. */
   sounding: () => boolean;
+  /** The artwork disc the backdrop's rings surround while in a room; null in the lobby. */
+  anchor: () => HTMLElement | null;
+  /** The people to draw as lights in the backdrop: a hue each, and how bright. */
+  orbs: () => Array<{ hue: number; energy: number }>;
 }
 
 const HUES = [30, 200, 280, 140, 340, 50, 170, 250];
+/** A few quiet lights for the lobby: the room you are about to make. */
+const LOBBY_ORBS = [30, 280, 200, 340].map((hue) => ({ hue, energy: 0.1 }));
 
 /** The plan's words for each reason the room can refuse something. */
 const REFUSALS: Record<Refusal | 'none', string> = {
@@ -121,9 +129,10 @@ export function initRooms(host: RoomsHost): Rooms {
     name: el('room-name'),
     code: el('room-code'),
     peopleCount: el('people-count'),
+    faces: el('people-faces'),
     settingsButton: el('settings-button'),
     banner: el('room-banner'),
-    frame: el('frame'),
+    players: el('players'),
     frameArt: el('frame-art'),
     frameMono: el('frame-mono'),
     badge: el('room-badge'),
@@ -131,6 +140,8 @@ export function initRooms(host: RoomsHost): Rooms {
     time: el('room-time'),
     title: el('room-title'),
     by: el('room-by'),
+    byFace: el('room-by-face'),
+    queueCount: el('queue-count'),
     progress: el('room-progress'),
     speaking: el('speaking'),
     speakingArt: el('speaking-art'),
@@ -156,8 +167,6 @@ export function initRooms(host: RoomsHost): Rooms {
     approvals: el('approvals'),
     items: el('items'),
     queueEmpty: el('queue-empty'),
-    historyTitle: el('history-title'),
-    history: el('history'),
     itemTemplate: el<HTMLTemplateElement>('item-template'),
     personTemplate: el<HTMLTemplateElement>('person-template'),
     approvalTemplate: el<HTMLTemplateElement>('approval-template'),
@@ -229,19 +238,32 @@ export function initRooms(host: RoomsHost): Rooms {
     },
   });
 
-  const applyVolume = () => player?.volume(level * duck);
+  /**
+   * Loudness is four things multiplied: this device's volume, the dip under a
+   * voice note, the song's own fade in and out, and a gate that stays shut
+   * until a device joining mid-song is in step. One mixer glides the player
+   * towards that product, so no change of loudness is ever abrupt.
+   */
+  let edge = 0;
+  let gate = 1;
+  let applied = 0;
+  let mixedAt = performance.now();
+  let mixedFor: RoomPlayer | null = null;
+  window.setInterval(() => {
+    const clock = performance.now();
+    const target = listening && player ? level * duck * edge * gate : 0;
+    const next = glide(applied, target, clock - mixedAt, GLIDE_MS);
+    mixedAt = clock;
+    if (!player || (next === applied && mixedFor === player)) return;
+    applied = next;
+    mixedFor = player;
+    player.volume(applied);
+  }, 40);
 
-  function fade(to: number, ms: number): void {
-    const from = duck;
-    const began = performance.now();
-    const step = () => {
-      const t = Math.min(1, (performance.now() - began) / ms);
-      duck = from + (to - from) * t;
-      applyVolume();
-      if (t < 1) requestAnimationFrame(step);
-    };
-    step();
-  }
+  /** Set the dip under a voice note; the mixer carries it there smoothly. */
+  const fade = (to: number): void => {
+    duck = to;
+  };
 
   function silence(): void {
     player?.rate(1);
@@ -250,10 +272,12 @@ export function initRooms(host: RoomsHost): Rooms {
     loaded = '';
   }
 
+  /** Put a player on the page. It stays out of sight; the artwork is what people look at. */
   function showPicture(picture: HTMLElement | null): void {
-    for (const child of [...view.frame.children]) if (child !== view.frameArt) child.remove();
-    view.frame.toggleAttribute('data-picture', picture !== null);
-    if (picture) view.frame.append(picture);
+    // A player already in place must be left exactly where it is: taking an
+    // embedded player out of the page and putting it back reloads it from scratch.
+    if (picture && picture.parentElement === view.players) return;
+    view.players.replaceChildren(...(picture ? [picture] : []));
   }
 
   /** Bring this device's player to where the room's timeline says it should be. Runs four times a second. */
@@ -293,6 +317,7 @@ export function initRooms(host: RoomsHost): Rooms {
       return;
     }
     const lead = leads.get(player) ?? 0;
+    edge = envelope(wanted, item.seconds, FADE_IN_SECONDS, FADE_OUT_SECONDS);
     if (wanted < 0) {
       if (phase !== 'armed') {
         phase = 'armed';
@@ -300,6 +325,7 @@ export function initRooms(host: RoomsHost): Rooms {
         // moving when its moment comes. A live station has nothing to warm up.
         if (item.seconds > 0 && primed !== item.id) {
           primed = item.id;
+          applied = 0;
           player.volume(0);
           player.rate(1);
           player.seek(0);
@@ -312,7 +338,8 @@ export function initRooms(host: RoomsHost): Rooms {
     if (phase !== 'playing') {
       player.rate(1);
       if (item.seconds > 0) player.seek(wanted + lead);
-      applyVolume();
+      // Joining a song already under way: stay silent until in step, then fade in.
+      gate = wanted > FADE_IN_SECONDS ? 0 : 1;
       player.play();
       phase = 'playing';
       startedAt = performance.now();
@@ -328,6 +355,8 @@ export function initRooms(host: RoomsHost): Rooms {
       blocked = !player.playing();
       render();
     }
+    // In step or not, do not keep a listener in silence: open the gate after a few seconds regardless.
+    if (gate === 0 && clock - startedAt > 6000) gate = 1;
     if (rateUntil && clock >= rateUntil) {
       rateUntil = 0;
       player.rate(1);
@@ -343,6 +372,7 @@ export function initRooms(host: RoomsHost): Rooms {
       if (current !== player || phase !== 'playing' || !room || room.pausedAt !== null || !current.playing()) return;
       const target = (now() - room.startAt) / 1000;
       const error = actual - target;
+      if (Math.abs(error) < LOCK_SECONDS) gate = 1;
       // The first reading after a jump shows how far off the jump landed: learn from it.
       if (jumped) {
         jumped = false;
@@ -370,6 +400,8 @@ export function initRooms(host: RoomsHost): Rooms {
   const noteAudio = new Audio();
   const notes = new Map<string, { blob: Promise<string>; timers: number[] }>();
   let speakingNote = '';
+  /** The name of whoever's voice note is playing now. */
+  let speaker = '';
 
   function scheduleNotes(): void {
     if (!room || !code) return;
@@ -383,6 +415,7 @@ export function initRooms(host: RoomsHost): Rooms {
       const finish = begin + note.seconds * 1000;
       const start = window.setTimeout(() => {
         speakingNote = note.id;
+        speaker = note.byName;
         tint(view.speakingArt, view.speakingMono, note.byName, note.colour);
         view.speakingText.textContent = `${note.byName} is speaking`;
         view.speaking.hidden = false;
@@ -390,7 +423,10 @@ export function initRooms(host: RoomsHost): Rooms {
         if (listening) void playNote(note.id);
       }, begin);
       const end = window.setTimeout(() => {
-        if (speakingNote === note.id) view.speaking.hidden = true;
+        if (speakingNote === note.id) {
+          view.speaking.hidden = true;
+          speaker = '';
+        }
         void blob.then((url) => URL.revokeObjectURL(url), () => undefined);
       }, finish + 400);
       notes.set(note.id, { blob, timers: [start, end] });
@@ -402,11 +438,11 @@ export function initRooms(host: RoomsHost): Rooms {
     if (!entry) return;
     try {
       noteAudio.src = await entry.blob;
-      fade(DUCK_LEVEL, DUCK_DOWN_MS);
-      noteAudio.onended = noteAudio.onerror = () => fade(1, DUCK_UP_MS);
+      fade(DUCK_LEVEL);
+      noteAudio.onended = noteAudio.onerror = () => fade(1);
       await noteAudio.play();
     } catch {
-      fade(1, DUCK_UP_MS);
+      fade(1);
     }
   }
 
@@ -524,22 +560,21 @@ export function initRooms(host: RoomsHost): Rooms {
   // ------------------------------------------------------------------ rendering
 
   let itemsKey = '';
-  let historyKey = '';
   let peopleKey = '';
   let approvalsKey = '';
 
-  function itemRow(item: ItemView, played: boolean): HTMLElement {
+  function itemRow(item: ItemView): HTMLElement {
     const row = (view.itemTemplate.content.firstElementChild as HTMLElement).cloneNode(true) as HTMLElement;
     row.dataset['id'] = item.id;
     tint(row.querySelector<HTMLElement>('.logo')!, row.querySelector('.item-mono')!, item.title, undefined, item.image ?? stationLogo(item.source));
     row.querySelector('.item-title')!.textContent = item.title;
-    row.querySelector('.item-by')!.textContent = item.failed
-      ? 'Could not play'
-      : `${item.byName}${item.seconds ? `  ·  ${duration(item.seconds)}` : '  ·  Station'}`;
-    const mine = item.by === room!.you.id;
-    row.querySelector<HTMLElement>('[data-item="next"]')!.hidden = played || !room!.you.host;
-    row.querySelector<HTMLElement>('[data-item="remove"]')!.hidden = played || !(mine || room!.you.host);
-    row.querySelector<HTMLElement>('[data-item="again"]')!.hidden = !played || !room!.you.canAdd;
+    // Who added it, in their own colour.
+    const adder = room!.people.find((person) => person.id === item.by);
+    row.querySelector<HTMLElement>('.avatar')!.style.setProperty('--hue', String(HUES[(adder?.colour ?? 0) % HUES.length]));
+    row.querySelector('.item-who')!.textContent = item.by === room!.you.id ? 'You' : item.byName;
+    row.querySelector('.item-length')!.textContent = item.seconds ? duration(item.seconds) : 'Station';
+    // Only the person who added it, or the host, may delete it.
+    row.querySelector<HTMLElement>('[data-item="remove"]')!.hidden = !(item.by === room!.you.id || room!.you.host);
     return row;
   }
 
@@ -553,6 +588,19 @@ export function initRooms(host: RoomsHost): Rooms {
     view.name.textContent = room.name;
     view.code.textContent = room.code;
     view.peopleCount.textContent = String(here.length);
+    // Up to four faces in the header; the count says how many there are in all.
+    const faces = here.slice(0, 4).map((person) => person.colour).join(',');
+    if (view.faces.dataset['shown'] !== faces) {
+      view.faces.dataset['shown'] = faces;
+      const figure = view.personTemplate.content.querySelector('.avatar')!;
+      view.faces.replaceChildren(
+        ...here.slice(0, 4).map((person) => {
+          const face = figure.cloneNode(true) as HTMLElement;
+          face.style.setProperty('--hue', String(HUES[person.colour % HUES.length]));
+          return face;
+        }),
+      );
+    }
     view.settingsButton.hidden = !you.host;
     view.banner.hidden = status === 'connected';
     view.banner.textContent = 'Reconnecting…';
@@ -571,6 +619,10 @@ export function initRooms(host: RoomsHost): Rooms {
         : !listening
           ? `Added by ${current.byName}  ·  Not playing on this device`
           : `Added by ${current.byName}`;
+    view.byFace.hidden = !current;
+    const adder = current && room.people.find((person) => person.id === current.by);
+    if (adder) view.byFace.style.setProperty('--hue', String(HUES[adder.colour % HUES.length]));
+    view.queueCount.textContent = room.queue.length ? `${room.queue.length} waiting` : '';
     if (current) tint(view.frameArt, view.frameMono, current.title, undefined, current.image ?? stationLogo(current.source));
     else tint(view.frameArt, view.frameMono, room.name);
 
@@ -578,6 +630,7 @@ export function initRooms(host: RoomsHost): Rooms {
     view.listen.setAttribute('aria-pressed', String(listening && !blocked));
     // Some phones only let a video start from a tap on the video itself.
     const tapVideo = blocked && current !== null && (current.source.kind === 'youtube' || current.source.kind === 'soundcloud');
+    view.players.toggleAttribute('data-reveal', tapVideo);
     view.listen.textContent = !listening ? 'Listen here' : tapVideo ? 'Tap the video to start sound' : blocked ? 'Tap to start sound' : 'Stop listening';
     view.pause.hidden = !you.host;
     view.pause.disabled = !current;
@@ -617,17 +670,13 @@ export function initRooms(host: RoomsHost): Rooms {
     view.addLink.placeholder = cannotAdd || 'Paste a YouTube, SoundCloud or audio link';
 
     // Lists: rebuilt only when their contents change, never on every update.
-    const key = (items: ItemView[]) => items.map((item) => `${item.id}:${item.failed ? 'x' : ''}`).join(',') + `|${you.host}|${you.canAdd}`;
-    if (itemsKey !== key(room.queue)) {
-      itemsKey = key(room.queue);
-      view.items.replaceChildren(...room.queue.map((item) => itemRow(item, false)));
-    }
-    if (historyKey !== key(room.history)) {
-      historyKey = key(room.history);
-      view.history.replaceChildren(...room.history.map((item) => itemRow(item, true)));
+    // Rebuilt only when its contents change, never on every update.
+    const key = room.queue.map((item) => item.id).join(',') + `|${you.host}|${room.people.length}`;
+    if (itemsKey !== key) {
+      itemsKey = key;
+      view.items.replaceChildren(...room.queue.map(itemRow));
     }
     view.queueEmpty.hidden = room.queue.length > 0;
-    view.historyTitle.hidden = room.history.length === 0;
 
     const waiting = room.notes.filter((note) => note.state === 'approval');
     const nextApprovals = waiting.map((note) => note.id).join(',') + `|${you.host}`;
@@ -948,12 +997,7 @@ export function initRooms(host: RoomsHost): Rooms {
     const item = target.closest<HTMLElement>('[data-item]');
     if (item && room) {
       const id = item.closest<HTMLElement>('.item')!.dataset['id']!;
-      if (item.dataset['item'] === 'remove') connection?.send({ type: 'remove', item: id });
-      if (item.dataset['item'] === 'next') connection?.send({ type: 'move', item: id, to: 0 });
-      if (item.dataset['item'] === 'again') {
-        const again = room.history.find((played) => played.id === id);
-        if (again) connection?.send({ type: 'add', source: again.source, title: again.title, seconds: again.seconds, ...(again.image ? { image: again.image } : {}) });
-      }
+      connection?.send({ type: 'remove', item: id });
       return;
     }
 
@@ -993,7 +1037,6 @@ export function initRooms(host: RoomsHost): Rooms {
   view.volume.addEventListener('input', () => {
     level = view.volume.valueAsNumber / 100;
     store('iradio.room-volume', String(view.volume.valueAsNumber));
-    applyVolume();
     render();
   });
   view.joinCode.addEventListener('input', () => {
@@ -1021,6 +1064,14 @@ export function initRooms(host: RoomsHost): Rooms {
     },
     inRoom: () => room !== null,
     sounding: () => listening && phase === 'playing' && !blocked,
+    anchor: () => (room ? view.frameArt : null),
+    orbs: () =>
+      room
+        ? room.people
+            .filter((person) => person.here)
+            // Brightest while their voice note plays, bright while listening, dim while just present.
+            .map((person) => ({ hue: HUES[person.colour % HUES.length]!, energy: person.name === speaker ? 1 : person.listening ? 0.55 : 0.15 }))
+        : LOBBY_ORBS,
     code: () => room?.code ?? null,
     addStation: (station) => {
       if (!room) return;

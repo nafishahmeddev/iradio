@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { makeCode, tidyCode } from '../../src/lib/rooms/code';
-import { between, correct, learnLead } from '../../src/lib/rooms/follow';
+import { between, correct, envelope, glide, learnLead } from '../../src/lib/rooms/follow';
 import { fileTitle, parseLink } from '../../src/lib/rooms/links';
 import { CODE_ALPHABET, EMPTY_ROOM_MS, HEAD_START_MS, HOST_AWAY_MS, ROOM_LIFE_MS } from '../../src/lib/rooms/limits';
 import { parseEvent, viewFor } from '../../src/lib/rooms/protocol';
@@ -188,7 +188,7 @@ describe('the queue', () => {
     expect(room.act('host', song('a')).refused).toBeUndefined();
   });
 
-  it('lets people remove their own waiting songs and the host any', () => {
+  it('lets only the person who added a song, or the host, delete it', () => {
     const room = session();
     room.join('g1', 'Maya');
     room.join('g2', 'Lee');
@@ -200,15 +200,11 @@ describe('the queue', () => {
     expect(room.titles()).toEqual([]);
   });
 
-  it('keeps a dragged song where the host put it', () => {
-    const room = session();
-    room.act('host', song('now'));
-    for (const id of ['a', 'b', 'c']) room.act('host', song(id));
-    room.act('host', { type: 'move', item: room.state.queue[2]!.id, to: 0 });
-    expect(room.titles()).toEqual(['Song c', 'Song a', 'Song b']);
+  it('cannot be reordered by anyone', () => {
+    expect(parseEvent({ type: 'move', item: 'i1', to: 0 })).toBeNull();
   });
 
-  it('moves on by itself when a song ends, and keeps history', () => {
+  it('moves on by itself when a song ends', () => {
     const room = session();
     room.act('host', song('a', 100));
     room.act('host', song('b', 100));
@@ -216,7 +212,7 @@ describe('the queue', () => {
     expect(end).toBe(T0 + HEAD_START_MS + 100_000 + 400);
     room.act('host', { type: 'wake' }, end);
     expect(room.state.current?.title).toBe('Song b');
-    expect(room.state.history.map((item) => item.title)).toEqual(['Song a']);
+    expect(room.state.queue).toEqual([]);
   });
 
   it('plays a station until it is skipped', () => {
@@ -261,7 +257,6 @@ describe('skipping', () => {
     expect(room.state.current?.id).toBe(id);
     room.act('host', { type: 'failed', item: id });
     expect(room.state.current).toBeNull();
-    expect(room.state.history[0]?.failed).toBe(true);
   });
 });
 
@@ -285,6 +280,9 @@ describe('voice notes', () => {
   it('follows the who-may-send setting, with asking and allowing', () => {
     const room = session();
     room.join('g1', 'Maya');
+    // A new room lets everyone send; the host can narrow it to chosen people.
+    expect(room.state.settings.notes).toBe('everyone');
+    room.act('host', { type: 'settings', settings: { notes: 'selected' } });
     expect(room.act('g1', note('n1')).refused).toBe('not-allowed');
     room.act('g1', { type: 'mic-ask' });
     expect(room.state.people[1]).toMatchObject({ askedMic: true, mayNote: false });
@@ -311,7 +309,6 @@ describe('voice notes', () => {
   it('holds a note for the gap when the song is nearly over, or when asked to', () => {
     const room = session();
     room.join('g1', 'Maya');
-    room.act('host', { type: 'settings', settings: { notes: 'everyone' } });
     room.act('host', song('a', 100));
     room.act('host', song('b', 100));
     const nearEnd = T0 + HEAD_START_MS + 95_000;
@@ -364,7 +361,7 @@ describe('the room ending', () => {
   it('closes after 30 empty minutes, or 24 hours, or when the host ends it', () => {
     const empty = session();
     empty.act('host', { type: 'leave' }, T0 + 1000);
-    expect(wakeAt(empty.state)).toBe(T0 + 1000 + HOST_AWAY_MS - HOST_AWAY_MS + Math.min(HOST_AWAY_MS, EMPTY_ROOM_MS));
+    expect(wakeAt(empty.state)).toBe(T0 + 1000 + EMPTY_ROOM_MS);
     const outcome = empty.act('host', { type: 'wake' }, T0 + 1000 + EMPTY_ROOM_MS);
     expect(outcome.state.closed).toBe(true);
 
@@ -389,7 +386,7 @@ describe('what each person is sent', () => {
     room.act('g1', { type: 'skip' });
     const view = viewFor(room.state, 'g1');
     expect(JSON.stringify(view)).not.toMatch(/"device"|"g1"|"host":"host"/);
-    expect(view.you).toMatchObject({ host: false, canAdd: true, canNote: false });
+    expect(view.you).toMatchObject({ host: false, canAdd: true, canNote: true });
     expect(view.current).toMatchObject({ votes: 1, voted: true });
     expect(viewFor(room.state, 'host').current).toMatchObject({ votes: 1, voted: false });
   });
@@ -461,5 +458,85 @@ describe('staying in step', () => {
     expect(between(10, 1000, 1200, 1, false)).toBe(10);
     // A stalled player is not assumed to have run on.
     expect(between(10, 1000, 9000, 1, true)).toBeCloseTo(10.6);
+  });
+});
+
+describe('fades', () => {
+  it('eases a song in at its start and out at its end', () => {
+    expect(envelope(-1, 200, 1.2, 2.5)).toBe(0);
+    expect(envelope(0.6, 200, 1.2, 2.5)).toBeCloseTo(0.5);
+    expect(envelope(100, 200, 1.2, 2.5)).toBe(1);
+    expect(envelope(198.75, 200, 1.2, 2.5)).toBeCloseTo(0.5);
+    expect(envelope(200, 200, 1.2, 2.5)).toBe(0);
+    expect(envelope(205, 200, 1.2, 2.5)).toBe(0);
+  });
+
+  it('only eases a station in, since it has no end', () => {
+    expect(envelope(0.6, 0, 1.2, 2.5)).toBeCloseTo(0.5);
+    expect(envelope(9000, 0, 1.2, 2.5)).toBe(1);
+  });
+
+  it('never snaps loudness, and never overshoots', () => {
+    expect(glide(0, 1, 100, 500)).toBeCloseTo(0.2);
+    expect(glide(1, 0.15, 100, 500)).toBeCloseTo(0.8);
+    expect(glide(0.9, 1, 5000, 500)).toBe(1);
+    expect(glide(0.2, 0.15, 5000, 500)).toBe(0.15);
+  });
+});
+
+describe('a room waking itself', () => {
+  /** Run a room forward by its own wake-ups alone and count them. */
+  function run(room: ReturnType<typeof session>, from: number) {
+    let now = from;
+    let wakes = 0;
+    for (; wakes < 50; wakes++) {
+      const next = wakeAt(room.state);
+      if (next === null) break;
+      // A wake-up that is not in the future is a room spinning in place.
+      expect(next, `wake ${wakes} at ${now}`).toBeGreaterThan(now);
+      now = next;
+      room.act('', { type: 'wake' }, now);
+    }
+    return { wakes, closed: room.state.closed };
+  }
+
+  it('does not spin when the host leaves an empty room', () => {
+    const room = session();
+    room.act('host', { type: 'leave' }, T0 + 1000);
+    // One wake: the room closing after 30 empty minutes.
+    expect(wakeAt(room.state)).toBe(T0 + 1000 + EMPTY_ROOM_MS);
+    expect(run(room, T0 + 1000)).toEqual({ wakes: 1, closed: true });
+  });
+
+  it('does not spin when everyone leaves mid-song with songs waiting', () => {
+    const room = session();
+    room.join('g1', 'Maya');
+    room.act('host', song('a', 100));
+    room.act('g1', song('b', 100));
+    room.act('host', { type: 'leave' }, T0 + 5000);
+    room.act('g1', { type: 'leave' }, T0 + 6000);
+    const result = run(room, T0 + 6000);
+    expect(result.closed).toBe(true);
+    expect(result.wakes).toBeLessThan(6);
+  });
+
+  it('does not spin when the stand-in host leaves too', () => {
+    const room = session();
+    room.join('g1', 'Maya', T0 + 1);
+    room.act('host', { type: 'leave' }, T0 + 10);
+    room.act('', { type: 'wake' }, T0 + 10 + HOST_AWAY_MS);
+    expect(hostDevice(room.state)).toBe('g1');
+    room.act('g1', { type: 'leave' }, T0 + 200_000);
+    expect(run(room, T0 + 200_000)).toEqual({ wakes: 1, closed: true });
+  });
+
+  it('always moves forward through a full session', () => {
+    const room = session();
+    room.join('g1', 'Maya');
+    room.act('host', song('a', 30));
+    room.act('g1', song('b', 30));
+    room.act('host', { type: 'note', id: 'n1', seconds: 5, when: 'after' }, T0 + 1000);
+    const result = run(room, T0 + 1000);
+    expect(result.wakes).toBeLessThan(12);
   });
 });
