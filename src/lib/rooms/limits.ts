@@ -36,7 +36,9 @@ export const FADE_OUT_SECONDS = 2.5;
 /** How long any change of loudness takes to arrive, so nothing ever snaps. */
 export const GLIDE_MS = 500;
 /** A device joining mid-song stays silent until it is this close to the timeline, then fades in. */
-export const LOCK_SECONDS = 0.1;
+export const LOCK_SECONDS = 0.15;
+/** For this long after a jump, the remaining gap is closed by speed and not by another jump. */
+export const REJUMP_WINDOW_MS = 10_000;
 
 export const HOST_AWAY_MS = 60_000;
 export const EMPTY_ROOM_MS = 30 * 60_000;

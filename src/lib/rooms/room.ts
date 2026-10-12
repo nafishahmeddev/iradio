@@ -239,7 +239,7 @@ function advance(state: RoomState, now: number): void {
 
 /** Why a song could not play, in words; the reason is the code the player gave. */
 function whyUnplayable(reason: string): string {
-  if (reason === 'youtube-101' || reason === 'youtube-150') return 'Its owner does not allow it outside YouTube.';
+  if (reason === 'youtube-101' || reason === 'youtube-150') return 'YouTube would not play it here.';
   if (reason === 'youtube-100') return 'It was removed or made private.';
   return 'It would not play.';
 }

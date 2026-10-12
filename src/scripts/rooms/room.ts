@@ -4,7 +4,7 @@ import qrcode from 'qrcode-generator';
 
 import { duration } from '../../lib/format';
 import { tidyCode } from '../../lib/rooms/code';
-import { correct, envelope, glide, learnLead } from '../../lib/rooms/follow';
+import { confirmed, correct, envelope, glide, learnLead } from '../../lib/rooms/follow';
 import { parseLink } from '../../lib/rooms/links';
 import {
   DUCK_LEVEL,
@@ -12,6 +12,7 @@ import {
   FADE_OUT_SECONDS,
   GLIDE_MS,
   LOCK_SECONDS,
+  REJUMP_WINDOW_MS,
   MAX_SONG_SECONDS,
   MAX_WAITING,
   MAX_WAITING_EACH,
@@ -220,6 +221,7 @@ export function initRooms(host: RoomsHost): Rooms {
   /** No judging the position before this moment: a jump is still landing. */
   let settleUntil = 0;
   let jumped = false;
+  let jumpedAt = 0;
   /** A changed speed returns to normal at this moment. */
   let rateUntil = 0;
   let checking = false;
@@ -346,6 +348,9 @@ export function initRooms(host: RoomsHost): Rooms {
       startedAt = performance.now();
       checkedAt = 0;
       jumped = item.seconds > 0;
+      jumpedAt = performance.now();
+      // The first reading has nothing before it to agree with; do not let an old one stand in.
+      drift = 0;
       settleUntil = performance.now() + 1200;
       rateUntil = 0;
       return;
@@ -379,16 +384,20 @@ export function initRooms(host: RoomsHost): Rooms {
         jumped = false;
         leads.set(current, learnLead(leads.get(current) ?? 0, error));
       }
-      const fix = correct(error, target, current.rates, leads.get(current) ?? 0);
+      const before = drift;
+      drift = error;
+      const fix = correct(error, target, current.rates, leads.get(current) ?? 0, performance.now() - jumpedAt < REJUMP_WINDOW_MS);
+      // A single odd reading is not acted on; smooth sound matters more than chasing it.
+      if (fix.kind === 'none' || !confirmed(before, error)) return;
       if (fix.kind === 'rate') {
         current.rate(fix.rate);
         rateUntil = performance.now() + fix.forMs;
-      } else if (fix.kind === 'seek') {
+      } else {
         current.seek(fix.to);
         jumped = true;
+        jumpedAt = performance.now();
         settleUntil = performance.now() + 1200;
       }
-      drift = error;
     });
   }
 
@@ -636,6 +645,8 @@ export function initRooms(host: RoomsHost): Rooms {
     // Some phones only let a video start from a tap on the video itself.
     const tapVideo = blocked && current !== null && (current.source.kind === 'youtube' || current.source.kind === 'soundcloud');
     view.players.toggleAttribute('data-reveal', tapVideo);
+    // A YouTube video plays in view, in the disc, for as long as this device is playing it.
+    view.players.toggleAttribute('data-show', listening && current?.source.kind === 'youtube' && unavailable !== current.id);
     view.listen.textContent = !listening ? 'Listen here' : tapVideo ? 'Tap the video to start sound' : blocked ? 'Tap to start sound' : 'Stop listening';
     view.pause.hidden = !you.host;
     view.pause.disabled = !current;

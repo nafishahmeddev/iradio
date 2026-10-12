@@ -2,8 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "iradio",
   // The "iRadio" Cloudflare account. Pinned so a deploy cannot land in another account.
-  // The earlier copy at iradio.idexa.app lives in a different account and is
-  // deliberately not deployed to from here any more.
+  // A second copy at iradio.idexa.app lives in another account; see wrangler.idexa.jsonc.
   "account_id": "6f0b759c224c9c7f5db0e2eb6b689cbf",
   // Served at this domain; Cloudflare creates the DNS record and certificate.
   "routes": [{ "pattern": "app.theradio.click", "custom_domain": true }],

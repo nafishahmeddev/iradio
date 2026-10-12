@@ -1,7 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // A second copy of the app in the "Nafish Ahmed" Cloudflare account, with its own
-  // Durable Objects allowance. Deployed with `npm run deploy:idexa`.
+  // A second copy of the app, at iradio.idexa.app in the "Nafish Ahmed" Cloudflare
+  // account, with its own Durable Objects allowance. Deployed with `npm run deploy:idexa`.
+  // Everything but the name, account and address must stay the same as wrangler.jsonc.
   "name": "iradio",
   "account_id": "d432cc0bfc8bf14ee77375746659e504",
   "routes": [{ "pattern": "iradio.idexa.app", "custom_domain": true }],

@@ -19,6 +19,13 @@ export const IN_STEP = 0.04;
 export const JUMP_BEYOND = 1;
 /** A player that cannot change speed can only jump, and a jump is audible, so it tolerates more. */
 export const JUMP_BEYOND_FIXED = 0.25;
+/**
+ * A player with only coarse speeds also reports its position coarsely. It is left
+ * alone until it has drifted this far: chasing less is heard as stutter.
+ */
+export const DRIFT_ALLOWED = 0.15;
+/** Just after a jump the gap is closed by speed up to here, so a slow connection does not jump again and again. */
+export const REJUMP_BEYOND = 2.5;
 const STEP = 0.25;
 const FINE_LIMIT = 0.08;
 
@@ -26,19 +33,29 @@ const FINE_LIMIT = 0.08;
  * @param error Seconds the player is ahead of the timeline (negative: behind).
  * @param target Where the timeline is now, in seconds.
  * @param lead How long this device's jumps take to land, learned by `learnLead`.
+ * @param afterJump Whether the player jumped a moment ago.
  */
-export function correct(error: number, target: number, rates: Rates, lead: number): Correction {
+export function correct(error: number, target: number, rates: Rates, lead: number, afterJump = false): Correction {
   const size = Math.abs(error);
   if (size < IN_STEP) return { kind: 'none' };
   if (rates === 'none') return size > JUMP_BEYOND_FIXED ? { kind: 'seek', to: target + lead } : { kind: 'none' };
-  if (size > JUMP_BEYOND) return { kind: 'seek', to: target + lead };
+  if (size > (afterJump ? REJUMP_BEYOND : JUMP_BEYOND)) return { kind: 'seek', to: target + lead };
   if (rates === 'steps') {
+    if (size < DRIFT_ALLOWED) return { kind: 'none' };
     // Ahead: play at three-quarter speed; behind: one and a quarter. Each closes a quarter second per second.
     return { kind: 'rate', rate: error > 0 ? 1 - STEP : 1 + STEP, forMs: Math.round((size / STEP) * 1000) };
   }
   // A gentle speed change, too small to hear, re-judged every second.
   const change = Math.max(-FINE_LIMIT, Math.min(FINE_LIMIT, error * 0.6));
   return { kind: 'rate', rate: 1 - change, forMs: 1000 };
+}
+
+/**
+ * One reading of the position can be wrong: players report late when a device is busy.
+ * A gap is acted on only when the reading before it showed the same gap, on the same side.
+ */
+export function confirmed(previous: number, error: number): boolean {
+  return Math.abs(previous) >= IN_STEP && Math.sign(previous) === Math.sign(error);
 }
 
 /** After a jump lands `residual` seconds ahead of the timeline, adjust how far ahead to aim next time. */

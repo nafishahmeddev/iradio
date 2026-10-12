@@ -39,13 +39,19 @@ service worker included, on http://localhost:8787.
 Connect the repository under **Workers & Pages → Create → Import a repository**
 and set:
 
-| Setting | Value |
-| --- | --- |
-| Build command | `npm run build` |
-| Deploy command | `npx wrangler deploy` |
+| Setting | `app.theradio.click` | `iradio.idexa.app` |
+| --- | --- | --- |
+| Config file | `wrangler.jsonc` | `wrangler.idexa.jsonc` |
+| Build command | `npm run build` | `npm run build` |
+| Deploy command | `npx wrangler deploy` | `npx wrangler deploy -c wrangler.idexa.jsonc` |
+| Preview command | `npx wrangler versions upload` | `npx wrangler versions upload -c wrangler.idexa.jsonc` |
+
+The app runs at two addresses, each in its own Cloudflare account. A room made
+at one address does not exist at the other.
 
 Every push then builds and deploys on Cloudflare. To deploy from your own
-machine instead: `npx wrangler login` once, then `npm run deploy`.
+machine instead: `npx wrangler login` once, then `npm run deploy` or
+`npm run deploy:idexa`.
 
 The build downloads the second station catalogue and writes it into the site
 as about 1,300 small files, so it needs network access (Cloudflare's builds

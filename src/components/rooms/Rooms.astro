@@ -48,6 +48,8 @@ import { NAME_MAX, ROOM_NAME_MAX } from '../../lib/rooms/limits';
         <div class="disc logo" id="frame-art">
           <span id="frame-mono" aria-hidden="true"></span>
           <img id="frame-image" alt="" referrerpolicy="no-referrer" />
+          <!-- The players themselves. A YouTube video plays in view, inside the disc: YouTube does not allow its player to be hidden. -->
+          <div class="players" id="players"></div>
         </div>
 
         <div class="now">
@@ -77,9 +79,6 @@ import { NAME_MAX, ROOM_NAME_MAX } from '../../lib/rooms/limits';
           <button type="button" class="chip" id="mic" data-room="mic"><Icon name="mic" size={18} /><span id="mic-label">Voice note</span></button>
         </div>
         <div class="deck-volume"><Slider id="room-volume" label="Volume" min={0} max={100} step={VOLUME_STEP} value={DEFAULT_VOLUME} /></div>
-
-        <!-- The players themselves. Kept out of sight; shown only when a phone needs a tap on one to start sound. -->
-        <div class="players" id="players"></div>
       </div>
 
       <div class="queue glass">
@@ -377,7 +376,7 @@ import { NAME_MAX, ROOM_NAME_MAX } from '../../lib/rooms/limits';
   }
 
   .disc {
-    --logo: clamp(9rem, 26vh, 14rem);
+    --logo: clamp(max(12.5rem, 200px), 26vh, 14rem);
     margin-block: clamp(3rem, 9vh, 6rem);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius-full);
@@ -497,34 +496,38 @@ import { NAME_MAX, ROOM_NAME_MAX } from '../../lib/rooms/limits';
     width: min(100%, 15rem);
   }
 
-  /* Out of sight until a phone refuses to start sound without a tap on the player itself. */
+  /* The players fill the disc, over the artwork. Only a video is brought into view; sound-only players stay out of sight. */
   .players {
     position: absolute;
-    left: 50%;
-    bottom: 0;
-    width: 200px;
-    height: 200px;
-    translate: -50% 0;
+    inset: 0;
     opacity: 0;
     pointer-events: none;
-    overflow: hidden;
-    border-radius: var(--radius-sm);
+    transition: opacity var(--slow) var(--ease);
   }
 
+  .players[data-show] {
+    opacity: 1;
+  }
+
+  /* A phone that will not start sound without a tap on the player itself. The room, not a tap, decides everything else. */
   .players[data-reveal] {
-    position: static;
-    translate: none;
     opacity: 1;
     pointer-events: auto;
-    width: min(100%, 20rem);
-    height: auto;
-    aspect-ratio: 16 / 9;
   }
 
-  .players :global(iframe),
   .players > :global(div) {
-    width: 100%;
+    position: absolute;
+    inset: 0;
+  }
+
+  /* A widescreen video cropped to the disc: as tall as the disc and centred. */
+  .players :global(iframe) {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: calc(100% * 16 / 9);
     height: 100%;
+    translate: -50% 0;
     border: 0;
   }
 
@@ -755,8 +758,9 @@ import { NAME_MAX, ROOM_NAME_MAX } from '../../lib/rooms/limits';
     }
 
     .disc {
-      --logo: 9rem;
-      margin-block: 3.5rem 3rem;
+      /* A video plays in the disc, and YouTube asks for a player at least 200px on each side. */
+      --logo: max(12.5rem, 200px);
+      margin-block: 2.5rem 2rem;
     }
 
     .items {

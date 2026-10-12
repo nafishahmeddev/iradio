@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { makeCode, tidyCode } from '../../src/lib/rooms/code';
-import { between, correct, envelope, glide, learnLead } from '../../src/lib/rooms/follow';
+import { between, confirmed, correct, envelope, glide, learnLead } from '../../src/lib/rooms/follow';
 import { fileTitle, parseLink } from '../../src/lib/rooms/links';
 import { CODE_ALPHABET, EMPTY_ROOM_MS, HEAD_START_MS, HOST_AWAY_MS, ROOM_LIFE_MS } from '../../src/lib/rooms/limits';
 import { parseEvent, viewFor } from '../../src/lib/rooms/protocol';
@@ -257,7 +257,7 @@ describe('skipping', () => {
     expect(room.state.current?.id).toBe(id);
     const outcome = room.act('host', { type: 'failed', item: id, reason: 'youtube-150' });
     expect(room.state.current).toBeNull();
-    expect(outcome.notice).toBe('Skipped “Song a”. Its owner does not allow it outside YouTube.');
+    expect(outcome.notice).toBe('Skipped “Song a”. YouTube would not play it here.');
   });
 });
 
@@ -438,6 +438,23 @@ describe('staying in step', () => {
   it('jumps when the gap is too large, aiming ahead by the time a jump takes', () => {
     expect(correct(-3, 50, 'steps', 0.4)).toEqual({ kind: 'seek', to: 50.4 });
     expect(correct(1.5, 50, 'fine', 0.2)).toEqual({ kind: 'seek', to: 50.2 });
+  });
+
+  it('leaves a coarse player alone until it has drifted far enough to matter', () => {
+    expect(correct(0.1, 50, 'steps', 0)).toEqual({ kind: 'none' });
+    expect(correct(-0.14, 50, 'steps', 0)).toEqual({ kind: 'none' });
+    expect(correct(-0.16, 50, 'steps', 0)).toEqual({ kind: 'rate', rate: 1.25, forMs: 640 });
+  });
+
+  it('closes the gap by speed just after a jump, and jumps again only when far off', () => {
+    expect(correct(-2, 50, 'steps', 0.4, true)).toEqual({ kind: 'rate', rate: 1.25, forMs: 8000 });
+    expect(correct(-3, 50, 'steps', 0.4, true)).toEqual({ kind: 'seek', to: 50.4 });
+  });
+
+  it('acts on a gap only when two readings in a row agree', () => {
+    expect(confirmed(0, -0.3)).toBe(false);
+    expect(confirmed(0.3, -0.3)).toBe(false);
+    expect(confirmed(-0.2, -0.3)).toBe(true);
   });
 
   it('only jumps a fixed-speed player once the gap is plainly audible', () => {
